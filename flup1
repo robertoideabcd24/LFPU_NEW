@@ -1,0 +1,99 @@
+#!/usr/bin/env python3
+import sys
+import os
+from lexer import Lexer
+from parser import Parser, Asignacion, Numero, OperacionBinaria, Variable
+from interprete import Interpreter
+
+# Función para imprimir el árbol de sintaxis
+def imprimir_arbol_sintaxis(nodes):
+    if not isinstance(nodes, list):
+        nodes = [nodes]  # Convierte nodo individual en lista
+        
+    print("\nÁrbol de Sintaxis Abstracta (AST):")
+    for i, node in enumerate(nodes):
+        es_ultimo = (i == len(nodes) - 1)
+        _imprimir_nodo(node, "", es_ultimo)
+
+def _imprimir_nodo(node, prefijo, es_ultimo):
+    marcador = "└── " if es_ultimo else "├── "
+    print(prefijo + marcador, end="")
+    
+    if isinstance(node, Asignacion):
+        print(f"Asignacion({node.nombre_var} = {node.valor})")
+        nuevo_prefijo = prefijo + ("    " if es_ultimo else "│   ")
+        _imprimir_nodo(node.valor, nuevo_prefijo, True)
+    elif isinstance(node, OperacionBinaria):
+        print(f"OperacionBinaria({node.izquierda} {node.operador} {node.derecha})")
+        nuevo_prefijo = prefijo + ("    " if es_ultimo else "│   ")
+        _imprimir_nodo(node.izquierda, nuevo_prefijo, False)
+        _imprimir_nodo(node.derecha, nuevo_prefijo, True)
+    elif isinstance(node, (Numero, Variable)):
+        print(f"{node.__class__.__name__}({node.valor if isinstance(node, Numero) else node.nombre})")
+
+def ejecutar_archivo(archivo_flup):
+    """Carga y ejecuta un archivo .flup"""
+    if not os.path.exists(archivo_flup):
+        print(f"\033[91mError:\033[0m No se encontró '{archivo_flup}'")
+        return
+
+    try:
+        # Leer contenido del archivo
+        with open(archivo_flup, 'r') as f:
+            contenido = f.read().strip()
+
+        # Tokenizar el contenido
+        lexer = Lexer(contenido)
+        tokens = lexer.tokenizar()
+        print("\nTokens identificados:", tokens)
+
+        # Analizar los tokens
+        parser = Parser(tokens)
+        ast = parser.analizar()
+
+        # Mostrar el árbol de sintaxis abstracta
+        print("\nÁrbol de Sintaxis Abstracta (AST):")
+        imprimir_arbol_sintaxis(ast[0]) if ast else print("No hay declaraciones para analizar")
+
+        # Ejecutar el AST
+        interprete = Interpreter()
+        resultado = interprete.ejecutar(ast)
+
+        print(f"\nResultado de la ejecución de {archivo_flup}: {resultado}")
+
+        # Mostrar el estado de la memoria
+        print("\nEstado de la memoria después de la ejecución:")
+        interprete.imprimir_memoria()
+
+    except FileNotFoundError:
+        print(f"\n\033[91mError\033[0m: No se encontró el archivo '{archivo_flup}'")
+    
+    except SyntaxError as e:
+        print(f"\n\033[91mERROR DE SINTÁXIS:\033[0m {str(e)}")
+        
+        # Mostrar contenido del archivo con números de línea
+        if os.path.exists(archivo_flup):
+            print("\nArchivo con error:")
+            with open(archivo_flup, 'r') as f:
+                for i, line in enumerate(f, 1):
+                    print(f"{i}: {line.rstrip()}")
+    
+    except Exception as e:
+        print(f"\n\033[91mERROR INESPERADO:\033[0m {str(e)}")
+        import traceback
+        traceback.print_exc()
+
+    finally:
+        print("\n----- Ejecución completada -----")
+
+def main():
+    if len(sys.argv) < 2:
+        print("Uso: flup <archivo1.flup> [archivo2.flup ...]")
+        return
+
+    for archivo in sys.argv[1:]:
+        print(f"Ejecutando {archivo}...")
+        ejecutar_archivo(archivo)
+
+if __name__ == '__main__':
+    main()
