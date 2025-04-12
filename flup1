@@ -31,7 +31,7 @@ def _imprimir_nodo(node, prefijo, es_ultimo):
     elif isinstance(node, (Numero, Variable)):
         print(f"{node.__class__.__name__}({node.valor if isinstance(node, Numero) else node.nombre})")
 
-def ejecutar_archivo(archivo_flup):
+def ejecutar_archivo(archivo_flup, debug=False):
     """Carga y ejecuta un archivo .flup"""
     if not os.path.exists(archivo_flup):
         print(f"\033[91mError:\033[0m No se encontró '{archivo_flup}'")
@@ -43,57 +43,65 @@ def ejecutar_archivo(archivo_flup):
             contenido = f.read().strip()
 
         # Tokenizar el contenido
-        lexer = Lexer(contenido)
+        lexer = Lexer(contenido)  # Pasar el flag debug al lexer
+        lexer.debug = debug 
         tokens = lexer.tokenizar()
-        print("\nTokens identificados:", tokens)
+        
+        if debug:
+            print("\nTokens identificados:", tokens)
 
         # Analizar los tokens
         parser = Parser(tokens)
         ast = parser.analizar()
 
-        # Mostrar el árbol de sintaxis abstracta
-        print("\nÁrbol de Sintaxis Abstracta (AST):")
-        imprimir_arbol_sintaxis(ast[0]) if ast else print("No hay declaraciones para analizar")
+        # Mostrar el árbol de sintaxis abstracta solo en modo debug
+        if debug:
+            print("\nÁrbol de Sintaxis Abstracta (AST):")
+            imprimir_arbol_sintaxis(ast[0]) if ast else print("No hay declaraciones para analizar")
 
         # Ejecutar el AST
         interprete = Interpreter()
-        resultado = interprete.ejecutar(ast)
+        resultado = interprete.ejecutar(ast, debug)  # Pasar el flag debug al intérprete
 
-        print(f"\nResultado de la ejecución de {archivo_flup}: {resultado}")
+        if debug:
+            print(f"\nResultado de la ejecución de {archivo_flup}: {resultado}")
+            print("\nEstado de la memoria después de la ejecución:")
+            interprete.imprimir_memoria()
+        else:
+            # Solo mostrar resultados en modo silencioso
+            interprete.imprimir_memoria()
 
-        # Mostrar el estado de la memoria
-        print("\nEstado de la memoria después de la ejecución:")
-        interprete.imprimir_memoria()
-
-    except FileNotFoundError:
-        print(f"\n\033[91mError\033[0m: No se encontró el archivo '{archivo_flup}'")
-    
-    except SyntaxError as e:
-        print(f"\n\033[91mERROR DE SINTÁXIS:\033[0m {str(e)}")
-        
-        # Mostrar contenido del archivo con números de línea
-        if os.path.exists(archivo_flup):
-            print("\nArchivo con error:")
-            with open(archivo_flup, 'r') as f:
-                for i, line in enumerate(f, 1):
-                    print(f"{i}: {line.rstrip()}")
-    
     except Exception as e:
-        print(f"\n\033[91mERROR INESPERADO:\033[0m {str(e)}")
-        import traceback
-        traceback.print_exc()
+        print(f"\n\033[91mERROR:\033[0m {str(e)}")
+        if debug:
+            import traceback
+            traceback.print_exc()
 
-    finally:
+    if debug:
         print("\n----- Ejecución completada -----")
 
 def main():
     if len(sys.argv) < 2:
-        print("Uso: flup <archivo1.flup> [archivo2.flup ...]")
+        print("Uso: flup [ast] <archivo1.flup> [archivo2.flup ...]")
+        print("  ast - Muestra información detallada de tokens y AST")
         return
 
-    for archivo in sys.argv[1:]:
-        print(f"Ejecutando {archivo}...")
-        ejecutar_archivo(archivo)
+    # Verificar si el primer argumento es 'ast'
+    show_debug = False
+    file_args = sys.argv[1:]
+    
+    if sys.argv[1].lower() == 'ast':
+        show_debug = True
+        file_args = sys.argv[2:]  # Remover el argumento 'ast'
+    
+    if not file_args:
+        print("Error: Debes especificar al menos un archivo .flup")
+        return
+
+    for archivo in file_args:
+        if show_debug:
+            print(f"Ejecutando {archivo}...")
+        ejecutar_archivo(archivo, show_debug)
 
 if __name__ == '__main__':
     main()

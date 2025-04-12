@@ -1,11 +1,12 @@
 import re
 
 class Lexer:
-    def __init__(self, texto_entrada):
+    def __init__(self, texto_entrada, debug=False):  # Asegúrate de incluir debug como parámetro
         self.texto_entrada = texto_entrada
         self.tokens = []
         self.caracter_actual = None
         self.posicion = 0
+        self.debug = debug  # Nuevo parámetro para controlar la salida
         self.avanzar()
 
     def error(self):
@@ -230,7 +231,7 @@ class Lexer:
         while True:
             token = self.obtener_siguiente_token()
             
-            if token is None:  # Verificación adicional
+            if token is None:
                 break
                 
             if token[0] in ('EOF', 'FIN_ARCHIVO'):
@@ -241,6 +242,7 @@ class Lexer:
                 continue
                 
             tokens.append(token)
-            print(f"Token reconocido: {token}")  # Debug
+            if self.debug:  # Solo mostrar tokens en modo debug
+                print(f"Token reconocido: {token}")
             
         return tokens

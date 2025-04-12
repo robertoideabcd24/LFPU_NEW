@@ -4,16 +4,15 @@ class Interpreter:
     def __init__(self):
         self.memoria = {}
 
-    def ejecutar(self, ast):
+    def ejecutar(self, ast, debug=False):
         ultimo_resultado = None
         for declaracion in ast:
             if isinstance(declaracion, Asignacion):
-                # Primero evaluar y guardar en memoria
-                if isinstance(declaracion.valor, (Numero, Variable, OperacionBinaria)):
-                    valor = self.evaluar_expresion(declaracion.valor)
-                    self.memoria[declaracion.nombre_var] = valor
+                valor = self.evaluar_expresion(declaracion.valor)
+                self.memoria[declaracion.nombre_var] = valor
+                if debug:
                     print(f"Asignación: {declaracion.nombre_var} = {valor}")
-                    ultimo_resultado = valor  # Luego actualizar último resultado
+                ultimo_resultado = valor
         return ultimo_resultado
 
     def ejecutar_asignacion(self, asignacion):
@@ -61,6 +60,10 @@ class Interpreter:
         else:
             raise ValueError(f"Tipo de expresión no soportada: {type(expr)}")
 
-    def imprimir_memoria(self):
-        for var, valor in self.memoria.items():
-            print(f"{var}: {valor}")
+    def imprimir_memoria(self, json_format=False):
+        if json_format:
+            import json
+            print(json.dumps(self.memoria, indent=2))
+        else:
+            for var, valor in self.memoria.items():
+                print(f"{var}: {valor}")
