@@ -24,10 +24,31 @@ class Lexer:
 
     def numero(self):
         resultado = ''
-        while self.caracter_actual is not None and self.caracter_actual.isdigit():
+        tiene_punto = False
+        
+        # Manejar signo negativo (si existe)
+        if self.caracter_actual == '-':
+            resultado += '-'
+            self.avanzar()
+        
+        # Parte entera antes del punto
+        while self.caracter_actual and self.caracter_actual.isdigit():
             resultado += self.caracter_actual
             self.avanzar()
-        return ('ENTERO', int(resultado))
+        
+        # Parte decimal (después del punto)
+        if self.caracter_actual == '.':
+            tiene_punto = True
+            resultado += '.'
+            self.avanzar()
+            while self.caracter_actual and self.caracter_actual.isdigit():
+                resultado += self.caracter_actual
+                self.avanzar()
+        
+        if tiene_punto:
+            return ('FLOTANTE', float(resultado))
+        else:
+            return ('ENTERO', int(resultado))
 
     def identificador(self):
         resultado = ''
@@ -156,6 +177,21 @@ class Lexer:
                 if self.caracter_actual == ')':
                     self.avanzar()
                     return ('PAREN_DER', ')')
+                
+                # Manejar números negativos y flotantes
+                if (self.caracter_actual == '-' and 
+                    self.posicion < len(self.texto_entrada)-1 and 
+                    (self.texto_entrada[self.posicion+1].isdigit() or self.texto_entrada[self.posicion+1] == '.')):
+                    self.avanzar()  # Consume el '-'
+                    num_token = self.numero()
+                    if num_token[0] == 'ENTERO':
+                        return ('ENTERO', -num_token[1])
+                    else:
+                        return ('FLOTANTE', -num_token[1])
+
+                # Manejar números positivos
+                if self.caracter_actual.isdigit() or self.caracter_actual == '.':
+                    return self.numero()
                 
                 # Manejo robusto de :=
                 if self.caracter_actual == ':':

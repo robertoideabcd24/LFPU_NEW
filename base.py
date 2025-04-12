@@ -5,7 +5,7 @@ class Numero:
     
     def __repr__(self):
         return f"Numero({self.valor})"
-
+    
 class Variable:
     def __init__(self, nombre):
         self.nombre = nombre

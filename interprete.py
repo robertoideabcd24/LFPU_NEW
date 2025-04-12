@@ -32,6 +32,12 @@ class Interpreter:
         izquierda = self.evaluar_expresion(operacion.izquierda)
         derecha = self.evaluar_expresion(operacion.derecha)
 
+        # Conversión implícita de tipos
+        if isinstance(izquierda, int) and isinstance(derecha, float):
+            izquierda = float(izquierda)
+        elif isinstance(derecha, int) and isinstance(izquierda, float):
+            derecha = float(derecha)
+
         if operacion.operador == '+':
             return izquierda + derecha
         elif operacion.operador == '-':
@@ -39,7 +45,7 @@ class Interpreter:
         elif operacion.operador == '*':
             return izquierda * derecha
         elif operacion.operador == '/':
-            return izquierda // derecha  # División entera
+            return izquierda / derecha  # División que puede resultar en float
         else:
             raise ValueError(f"Operador no soportado: '{operacion.operador}'")
 
