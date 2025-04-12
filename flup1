@@ -6,7 +6,7 @@ from lexer import Lexer
 from parser import Parser, Asignacion, OperacionBinaria, Numero, Variable
 from interprete import Interpreter
 from colors import Colors
-from base import Asignacion, OperacionBinaria, Numero, Variable 
+from base import Asignacion, OperacionBinaria, Numero, Variable, Cadena, Prt 
 
 # Función para imprimir el árbol de sintaxis
 def imprimir_arbol_sintaxis(nodes):
@@ -39,6 +39,12 @@ def _imprimir_nodo(node, prefijo, es_ultimo):
         print(f"Numero({node.valor})")
     elif isinstance(node, Variable):
         print(f"Variable({node.nombre})")
+    elif isinstance(node, Cadena):
+        print(f"Cadena('{node.valor}')")
+    elif isinstance(node, Prt):
+        print(f"Prt(...)")
+        nuevo_prefijo = prefijo + ("    " if es_ultimo else "│   ")
+        _imprimir_nodo(node.expresion, nuevo_prefijo, True)
     else:
         print(f"Tipo de nodo desconocido: {type(node)}")
 

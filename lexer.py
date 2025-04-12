@@ -58,31 +58,7 @@ class Lexer:
             self.avanzar()
 
         reservadas = {
-            'and': 'AND',
-            'or': 'OR',
-            'not': 'NOT',
-            'div': 'DIV',
-            'mod': 'MOD',
-            'if': 'IF',
-            'then': 'THEN',
-            'else': 'ELSE',
-            'while': 'WHILE',
-            'do': 'DO',
-            'for': 'FOR',
-            'to': 'TO',
-            'downto': 'DOWNTO',
-            'repeat': 'REPEAT',
-            'until': 'UNTIL',
-            'begin': 'BEGIN',
-            'end': 'END',
-            'var': 'VAR',
-            'integer': 'INTEGER',
-            'boolean': 'BOOLEAN',
-            'true': 'TRUE',
-            'false': 'FALSE',
-            'procedure': 'PROCEDURE',
-            'function': 'FUNCTION',
-            'return': 'RETURN'
+            'prt': 'PRT',
         }
         
         return (reservadas.get(resultado.lower(), 'ID'), resultado)
@@ -194,6 +170,11 @@ class Lexer:
                 if self.caracter_actual.isdigit() or self.caracter_actual == '.':
                     return self.numero()
                 
+                if self.caracter_actual == '"':
+                    return self.cadena()
+                
+
+                
                 # Manejo robusto de :=
                 if self.caracter_actual == ':':
                     start_pos = self.posicion
@@ -225,6 +206,31 @@ class Lexer:
 
     def get_line_number(self, pos):
         return self.texto_entrada.count('\n', 0, pos) + 1
+    
+    def cadena(self):
+        resultado = ''
+        self.avanzar()  # Saltar la comilla inicial
+        
+        while self.caracter_actual is not None and self.caracter_actual != '"':
+            # Manejar caracteres escapados
+            if self.caracter_actual == '\\':
+                self.avanzar()
+                if self.caracter_actual == 'n':
+                    resultado += '\n'
+                elif self.caracter_actual == 't':
+                    resultado += '\t'
+                else:
+                    resultado += self.caracter_actual
+                self.avanzar()
+            else:
+                resultado += self.caracter_actual
+                self.avanzar()
+        
+        if self.caracter_actual != '"':
+            raise SyntaxError("Cadena sin cerrar")
+        
+        self.avanzar()  # Saltar la comilla final
+        return ('CADENA', resultado)
 
     def tokenizar(self):
         tokens = []

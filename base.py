@@ -29,3 +29,17 @@ class Asignacion:
 
     def __repr__(self):
         return f"Asignacion({self.nombre_var} = {self.valor})"
+    
+class Prt:
+    def __init__(self, expresion):
+        self.expresion = expresion  # Ahora acepta una expresión completa
+    
+    def __repr__(self):
+        return f"Prt({self.expresion})"
+    
+class Cadena:
+    def __init__(self, valor):
+        self.valor = valor
+    
+    def __repr__(self):
+        return f"Cadena('{self.valor}')"

@@ -1,4 +1,4 @@
-from base import Numero, Variable, OperacionBinaria, Asignacion
+from base import Numero, Variable, OperacionBinaria, Asignacion, Prt, Cadena
 from colors import Colors
 
 class Interpreter:
@@ -19,6 +19,9 @@ class Interpreter:
                     print(f"Asignación completada: {declaracion.nombre_var} = {valor}")
                 
                 ultimo_resultado = valor
+            elif isinstance(declaracion, Prt):  # Nueva condición para Prt
+                resultado = self.evaluar_expresion(declaracion.expresion, debug)
+                print(resultado)
         return ultimo_resultado
 
     def ejecutar_asignacion(self, asignacion):
@@ -37,22 +40,30 @@ class Interpreter:
         izquierda = self.evaluar_expresion(operacion.izquierda)
         derecha = self.evaluar_expresion(operacion.derecha)
 
+        # Concatenación de strings
+        if operacion.operador == '+':
+            return str(izquierda) + str(derecha)
+
         # Conversión implícita de tipos
         if isinstance(izquierda, int) and isinstance(derecha, float):
             izquierda = float(izquierda)
         elif isinstance(derecha, int) and isinstance(izquierda, float):
             derecha = float(derecha)
 
-        if operacion.operador == '+':
-            return izquierda + derecha
-        elif operacion.operador == '-':
-            return izquierda - derecha
-        elif operacion.operador == '*':
-            return izquierda * derecha
-        elif operacion.operador == '/':
-            return izquierda / derecha  # División que puede resultar en float
-        else:
-            raise ValueError(f"Operador no soportado: '{operacion.operador}'")
+        # Operaciones matemáticas
+        if isinstance(izquierda, (int, float)) and isinstance(derecha, (int, float)):
+            if operacion.operador == '+':
+                return izquierda + derecha
+            elif operacion.operador == '-':
+                return izquierda - derecha
+            elif operacion.operador == '*':
+                return izquierda * derecha
+            elif operacion.operador == '/':
+                return izquierda / derecha
+        
+        raise ValueError(f"Operación no soportada: {type(izquierda)} {operacion.operador} {type(derecha)}")
+        
+        
 
     def evaluar_expresion(self, expr, debug=False):
         if debug:
@@ -64,12 +75,14 @@ class Interpreter:
             if expr.nombre not in self.memoria:
                 raise NameError(f"Variable no definida: '{expr.nombre}'")
             return self.memoria[expr.nombre]
-        elif isinstance(expr, OperacionBinaria):
+        elif isinstance(expr, Cadena):  # Nuevo caso para cadenas
+            return expr.valor
+        elif isinstance(expr, OperacionBinaria) and expr.operador == '+':
             izquierda = self.evaluar_expresion(expr.izquierda, debug)
             derecha = self.evaluar_expresion(expr.derecha, debug)
             if debug:
                 print(f"Operación: {izquierda} {expr.operador} {derecha}")
-            return self.evaluar_operacion_binaria(expr)
+            return str(izquierda) + str(derecha)
         else:
             raise ValueError(f"Tipo de expresión no soportada: {type(expr)}")
 

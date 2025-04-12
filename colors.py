@@ -13,3 +13,5 @@ class Colors:
     # Opcional: puedes agregar estos si quieres más variedad
     TITULO = '\033[1;36m'      # Cyan negrita para títulos
     EXITO = '\033[1;32m'       # Verde negrita para mensajes positivos
+
+    PRINT = '\033[38;5;213m'  # Color morado claro para Prt

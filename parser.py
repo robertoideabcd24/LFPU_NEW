@@ -1,4 +1,4 @@
-from base import Numero, Variable, OperacionBinaria, Asignacion
+from base import Numero, Variable, OperacionBinaria, Asignacion, Prt, Cadena
 class Parser:
     def __init__(self, tokens):
         self.tokens = tokens
@@ -7,15 +7,53 @@ class Parser:
     def analizar(self):
         declaraciones = []
         while self.posicion < len(self.tokens):
-            if self.tokens[self.posicion][0] == 'ID':
+            token_actual = self.tokens[self.posicion]
+            
+            if token_actual[0] == 'ID':
                 declaracion = self.declaracion_asignacion()
-                if declaracion:
-                    declaraciones.append(declaracion)
-            elif self.tokens[self.posicion][0] == 'PUNTO_COMA':
+            elif token_actual[0] == 'PRT':
+                declaracion = self.declaracion_prt()
+            elif token_actual[0] == 'PUNTO_COMA':
                 self.posicion += 1
+                continue
             else:
                 break
-        return declaraciones  # Siempre devuelve una lista
+                
+            if declaracion:
+                declaraciones.append(declaracion)
+        return declaraciones
+
+    def declaracion_prt(self):
+        if self.posicion >= len(self.tokens) or self.tokens[self.posicion][0] != 'PRT':
+            return None
+            
+        self.posicion += 1  # Consumir 'Prt'
+        
+        try:
+            if self.posicion >= len(self.tokens) or self.tokens[self.posicion][0] != 'PAREN_IZQ':
+                raise SyntaxError("Se esperaba '(' después de Prt")
+                
+            self.posicion += 1  # Consumir '('
+            
+            if self.posicion >= len(self.tokens):
+                raise SyntaxError("Expresión faltante después de Prt")
+                
+            expresion = self.expresion()
+            expresion = self.optimizar_concatenacion(expresion)
+            
+            if self.posicion >= len(self.tokens) or self.tokens[self.posicion][0] != 'PAREN_DER':
+                raise SyntaxError("Se esperaba ')' después de la expresión en Prt")
+                
+            self.posicion += 1  # Consumir ')'
+            
+            if self.posicion >= len(self.tokens) or self.tokens[self.posicion][0] != 'PUNTO_COMA':
+                raise SyntaxError("Se esperaba ';' al final de la instrucción Prt")
+                
+            self.posicion += 1  # Consumir ';'
+            return Prt(expresion)
+            
+        except IndexError:
+            raise SyntaxError("Expresión incompleta en Prt")
 
     def expresion(self):
         nodo = self.termino()
@@ -73,10 +111,18 @@ class Parser:
         try:
             if self.posicion + 1 >= len(self.tokens):
                 raise SyntaxError("Asignación incompleta al final del archivo")
+            
+             # Buscar el token de asignación ignorando espacios
+            next_pos = self.posicion + 1
+            while next_pos < len(self.tokens) and self.tokens[next_pos][0].isspace():
+                next_pos += 1
                 
-            if self.tokens[self.posicion][0] == 'ID' and self.tokens[self.posicion + 1][0] == 'ASIGNACION':
+            if (self.tokens[self.posicion][0] == 'ID' and 
+            next_pos < len(self.tokens) and 
+            self.tokens[next_pos][0] == 'ASIGNACION'):
+            
                 nombre_var = self.tokens[self.posicion][1]
-                self.posicion += 2  # Avanzar sobre ID y ASIGNACION
+                self.posicion = next_pos + 1  # Saltar ID y ASIGNACION (ignorando espacios)
                 
                 # Verificar que hay tokens suficientes para la expresión
                 if self.posicion >= len(self.tokens):
@@ -103,8 +149,33 @@ class Parser:
         if 0 <= token_pos < len(self.tokens):
             return self.tokens[token_pos][2]  # Suponiendo que cada token es una tupla (tipo, valor, línea)
         return "desconocida"
+    
+    def optimizar_concatenacion(self, nodo):
+        if isinstance(nodo, OperacionBinaria) and nodo.operador == '+':
+            # Optimizar recursivamente ambos lados
+            izquierda = self.optimizar_concatenacion(nodo.izquierda)
+            derecha = self.optimizar_concatenacion(nodo.derecha)
+            
+            # Caso 1: Ambos son cadenas literales
+            if isinstance(izquierda, Cadena) and isinstance(derecha, Cadena):
+                return Cadena(izquierda.valor + derecha.valor)
+                
+            # Caso 2: Izquierda es cadena y derecha es variable/número
+            if isinstance(izquierda, Cadena):
+                return OperacionBinaria(izquierda, '+', derecha)
+                
+            # Caso 3: Concatenación múltiple
+            if isinstance(izquierda, OperacionBinaria) and izquierda.operador == '+':
+                return OperacionBinaria(izquierda, '+', derecha)
+                
+            return OperacionBinaria(izquierda, nodo.operador, derecha)
+        return nodo
+
 
     def factor(self):
+        if self.posicion >= len(self.tokens):
+            raise SyntaxError("Expresión incompleta - se esperaba más tokens")
+        
         token = self.tokens[self.posicion]
         
         if token[0] == 'ENTERO':
@@ -112,18 +183,21 @@ class Parser:
             return Numero(int(token[1]))
         elif token[0] == 'FLOTANTE':
             self.posicion += 1
-            return Numero(float(token[1])) 
+            return Numero(float(token[1]))
         elif token[0] == 'ID':
             self.posicion += 1
             return Variable(token[1])
+        elif token[0] == 'CADENA':
+            self.posicion += 1
+            return Cadena(token[1])
         elif token[0] == 'PAREN_IZQ':
             self.posicion += 1
             nodo = self.expresion()
             if self.posicion >= len(self.tokens) or self.tokens[self.posicion][0] != 'PAREN_DER':
-                raise SyntaxError("Error: Se esperaba ')' para cerrar paréntesis")
+                raise SyntaxError("Error: Se esperaba ')'")
             self.posicion += 1
             return nodo
-        elif token[0] == 'RESTA':  # Operador unario negativo
+        elif token[0] == 'RESTA':
             self.posicion += 1
             return OperacionBinaria(Numero(0), '-', self.factor())
         else:
