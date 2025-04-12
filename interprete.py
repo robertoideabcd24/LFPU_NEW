@@ -1,4 +1,5 @@
 from base import Numero, Variable, OperacionBinaria, Asignacion
+from colors import Colors
 
 class Interpreter:
     def __init__(self):
@@ -8,10 +9,15 @@ class Interpreter:
         ultimo_resultado = None
         for declaracion in ast:
             if isinstance(declaracion, Asignacion):
-                valor = self.evaluar_expresion(declaracion.valor)
-                self.memoria[declaracion.nombre_var] = valor
                 if debug:
-                    print(f"Asignación: {declaracion.nombre_var} = {valor}")
+                    print(f"\nProcesando asignación: {declaracion.nombre_var}")
+                
+                valor = self.evaluar_expresion(declaracion.valor, debug)
+                self.memoria[declaracion.nombre_var] = valor
+                
+                if debug:
+                    print(f"Asignación completada: {declaracion.nombre_var} = {valor}")
+                
                 ultimo_resultado = valor
         return ultimo_resultado
 
@@ -48,7 +54,10 @@ class Interpreter:
         else:
             raise ValueError(f"Operador no soportado: '{operacion.operador}'")
 
-    def evaluar_expresion(self, expr):
+    def evaluar_expresion(self, expr, debug=False):
+        if debug:
+            print(f"Evaluando expresión: {expr}")
+
         if isinstance(expr, Numero):
             return expr.valor
         elif isinstance(expr, Variable):
@@ -56,14 +65,25 @@ class Interpreter:
                 raise NameError(f"Variable no definida: '{expr.nombre}'")
             return self.memoria[expr.nombre]
         elif isinstance(expr, OperacionBinaria):
+            izquierda = self.evaluar_expresion(expr.izquierda, debug)
+            derecha = self.evaluar_expresion(expr.derecha, debug)
+            if debug:
+                print(f"Operación: {izquierda} {expr.operador} {derecha}")
             return self.evaluar_operacion_binaria(expr)
         else:
             raise ValueError(f"Tipo de expresión no soportada: {type(expr)}")
 
-    def imprimir_memoria(self, json_format=False):
-        if json_format:
-            import json
-            print(json.dumps(self.memoria, indent=2))
-        else:
-            for var, valor in self.memoria.items():
-                print(f"{var}: {valor}")
+    def imprimir_memoria(self):
+        """Muestra las variables con colores"""
+        if not self.memoria:
+            print("(no hay variables definidas)")
+            return
+            
+        for var, valor in self.memoria.items():
+            # Determinar el tipo de valor para el color
+            if isinstance(valor, (int, float)):
+                valor_str = f"{Colors.NUMERO}{valor}{Colors.RESET}"
+            else:
+                valor_str = str(valor)
+                
+            print(f"{Colors.VARIABLE}{var}{Colors.RESET}: {valor_str}")

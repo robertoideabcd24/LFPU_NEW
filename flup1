@@ -1,14 +1,21 @@
 #!/usr/bin/env python3
 import sys
 import os
+import readline  
 from lexer import Lexer
-from parser import Parser, Asignacion, Numero, OperacionBinaria, Variable
+from parser import Parser, Asignacion, OperacionBinaria, Numero, Variable
 from interprete import Interpreter
+from colors import Colors
+from base import Asignacion, OperacionBinaria, Numero, Variable 
 
 # Función para imprimir el árbol de sintaxis
 def imprimir_arbol_sintaxis(nodes):
+    if not nodes:  # Si no hay nodos
+        print("(Árbol vacío)")
+        return
+        
     if not isinstance(nodes, list):
-        nodes = [nodes]  # Convierte nodo individual en lista
+        nodes = [nodes]
         
     print("\nÁrbol de Sintaxis Abstracta (AST):")
     for i, node in enumerate(nodes):
@@ -20,88 +27,154 @@ def _imprimir_nodo(node, prefijo, es_ultimo):
     print(prefijo + marcador, end="")
     
     if isinstance(node, Asignacion):
-        print(f"Asignacion({node.nombre_var} = {node.valor})")
+        print(f"Asignacion({node.nombre_var} = ...)")
         nuevo_prefijo = prefijo + ("    " if es_ultimo else "│   ")
         _imprimir_nodo(node.valor, nuevo_prefijo, True)
     elif isinstance(node, OperacionBinaria):
-        print(f"OperacionBinaria({node.izquierda} {node.operador} {node.derecha})")
+        print(f"OperacionBinaria({node.operador})")
         nuevo_prefijo = prefijo + ("    " if es_ultimo else "│   ")
         _imprimir_nodo(node.izquierda, nuevo_prefijo, False)
         _imprimir_nodo(node.derecha, nuevo_prefijo, True)
-    elif isinstance(node, (Numero, Variable)):
-        print(f"{node.__class__.__name__}({node.valor if isinstance(node, Numero) else node.nombre})")
+    elif isinstance(node, Numero):
+        print(f"Numero({node.valor})")
+    elif isinstance(node, Variable):
+        print(f"Variable({node.nombre})")
+    else:
+        print(f"Tipo de nodo desconocido: {type(node)}")
 
-def ejecutar_archivo(archivo_flup, debug=False):
-    """Carga y ejecuta un archivo .flup"""
-    if not os.path.exists(archivo_flup):
-        print(f"\033[91mError:\033[0m No se encontró '{archivo_flup}'")
+
+def modo_interactivo():
+    """Modo consola interactiva mejorado"""
+    print(f"{Colors.TITULO}Bienvenido a FLUP v1.0 - Modo interactivo{Colors.RESET}")
+    #print(f"Escribe {Colors.EXITO}exit{Colors.RESET} para terminar")
+    #print(f"Presiona {Colors.EXITO}Enter dos veces{Colors.RESET} para mostrar variables\n")
+    
+    interprete = Interpreter()
+    empty_line_count = 0  # Contador de líneas vacías
+    
+    while True:
+        try:
+            entrada = input(f"{Colors.VARIABLE}flup>{Colors.RESET} ").strip()
+            
+            if entrada.lower() == 'exit':
+                break
+                
+            if not entrada:
+                empty_line_count += 1
+                if empty_line_count >= 2:  # Doble Enter
+                    print(f"\n{Colors.TITULO}=== Memoria ==={Colors.RESET}")
+                    interprete.imprimir_memoria()
+                    print()  # Salto de línea adicional
+                    empty_line_count = 0
+                continue
+            else:
+                empty_line_count = 0  # Resetear contador si hay entrada
+                
+            # Procesar entrada
+            lexer = Lexer(entrada)
+            tokens = lexer.tokenizar()
+            parser = Parser(tokens)
+            ast = parser.analizar()
+            
+            # Ejecutar y mostrar resultado individual si hay
+            resultado = interprete.ejecutar(ast, debug=False)
+            
+            #if resultado is not None:
+            #    print()
+                #print(f"  $~ {Colors.NUMERO}{resultado}{Colors.RESET}")
+                
+        except Exception as e:
+            print(f"{Colors.FAIL}Error: {str(e)}{Colors.RESET}")
+            empty_line_count = 0
+
+def aplicar_colores(texto):
+    """Aplica colores a los elementos del código"""
+    # Tokenizar el texto para identificar elementos
+    lexer = Lexer(texto)
+    tokens = lexer.tokenizar()
+    
+    resultado = []
+    for token_type, token_value in tokens:
+        if token_type == 'ID':
+            resultado.append(f"{Colors.VARIABLE}{token_value}{Colors.RESET}")
+        elif token_type in ('ENTERO', 'FLOTANTE'):
+            resultado.append(f"{Colors.NUMERO}{token_value}{Colors.RESET}")
+        elif token_type in ('SUMA', 'RESTA', 'MULT', 'DIV'):
+            resultado.append(f"{Colors.OPERADOR}{token_value}{Colors.RESET}")
+        elif token_type == 'ASIGNACION':
+            resultado.append(f"{Colors.ASIGNACION}{token_value}{Colors.RESET}")
+        else:
+            resultado.append(token_value)
+    
+    return ' '.join(resultado)
+
+def modo_script(archivo, debug=False):
+    """Ejecutar un archivo script"""
+    if not os.path.exists(archivo):
+        print(f"{Colors.FAIL}Error:{Colors.RESET} Archivo no encontrado")
         return
 
     try:
-        # Leer contenido del archivo
-        with open(archivo_flup, 'r') as f:
-            contenido = f.read().strip()
+        with open(archivo, 'r') as f:
+            contenido = f.read()
 
-        # Tokenizar el contenido
-        lexer = Lexer(contenido)  # Pasar el flag debug al lexer
-        lexer.debug = debug 
+        if debug:
+            print(f"\n{Colors.TITULO}=== Contenido del archivo ==={Colors.RESET}")
+            print(contenido)
+            print(f"{Colors.TITULO}============================{Colors.RESET}")
+
+        lexer = Lexer(contenido, debug=debug)
         tokens = lexer.tokenizar()
         
         if debug:
-            print("\nTokens identificados:", tokens)
-
-        # Analizar los tokens
+            print(f"\n{Colors.CYAN}=== Tokens identificados ==={Colors.RESET}")
+            for i, (token_type, token_value) in enumerate(tokens, 1):
+                color = ""
+                if token_type == 'ID': color = Colors.VARIABLE
+                elif token_type in ('ENTERO', 'FLOTANTE'): color = Colors.NUMERO
+                elif token_type in ('SUMA', 'RESTA', 'MULT', 'DIV'): color = Colors.OPERADOR
+                elif token_type == 'ASIGNACION': color = Colors.ASIGNACION
+                
+                print(f"  {i:2d}. {color}{token_type:12s}{Colors.RESET}: {token_value}")
+        
         parser = Parser(tokens)
         ast = parser.analizar()
-
-        # Mostrar el árbol de sintaxis abstracta solo en modo debug
+        
         if debug:
-            print("\nÁrbol de Sintaxis Abstracta (AST):")
-            imprimir_arbol_sintaxis(ast[0]) if ast else print("No hay declaraciones para analizar")
-
-        # Ejecutar el AST
+            print(f"\n{Colors.CYAN}=== Árbol de Sintaxis Abstracta ==={Colors.RESET}")
+            imprimir_arbol_sintaxis(ast)
+        
         interprete = Interpreter()
-        resultado = interprete.ejecutar(ast, debug)  # Pasar el flag debug al intérprete
-
-        if debug:
-            print(f"\nResultado de la ejecución de {archivo_flup}: {resultado}")
-            print("\nEstado de la memoria después de la ejecución:")
-            interprete.imprimir_memoria()
-        else:
-            # Solo mostrar resultados en modo silencioso
-            interprete.imprimir_memoria()
-
+        interprete.ejecutar(ast, debug=debug)
+        
+        print(f"\n{Colors.CYAN}=== Estado final de variables ==={Colors.RESET}")
+        interprete.imprimir_memoria()
+        
     except Exception as e:
-        print(f"\n\033[91mERROR:\033[0m {str(e)}")
+        print(f"{Colors.FAIL}ERROR:{Colors.RESET} {str(e)}")
         if debug:
             import traceback
             traceback.print_exc()
 
-    if debug:
-        print("\n----- Ejecución completada -----")
-
 def main():
-    if len(sys.argv) < 2:
-        print("Uso: flup [ast] <archivo1.flup> [archivo2.flup ...]")
-        print("  ast - Muestra información detallada de tokens y AST")
-        return
-
-    # Verificar si el primer argumento es 'ast'
-    show_debug = False
-    file_args = sys.argv[1:]
-    
-    if sys.argv[1].lower() == 'ast':
-        show_debug = True
-        file_args = sys.argv[2:]  # Remover el argumento 'ast'
-    
-    if not file_args:
-        print("Error: Debes especificar al menos un archivo .flup")
-        return
-
-    for archivo in file_args:
-        if show_debug:
-            print(f"Ejecutando {archivo}...")
-        ejecutar_archivo(archivo, show_debug)
+    try:
+        if len(sys.argv) == 1:
+            modo_interactivo()
+        elif len(sys.argv) == 2 and sys.argv[1] == 'v1':
+            modo_interactivo()
+        elif len(sys.argv) == 2:
+            modo_script(sys.argv[1])
+        elif len(sys.argv) == 3 and sys.argv[1] == 'ast':
+            modo_script(sys.argv[2], debug=True)
+        else:
+            print("Uso:")
+            print("  flup v1          - Modo interactivo")
+            print("  flup script.flup - Ejecutar archivo")
+            print("  flup ast script.flup - Modo depuración")
+    except KeyboardInterrupt:
+        print("\nEjecución interrumpida por el usuario")
+    except Exception as e:
+        print(f"\n{Colors.FAIL}Error inesperado:{Colors.RESET} {str(e)}")
 
 if __name__ == '__main__':
     main()
