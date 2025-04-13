@@ -64,7 +64,6 @@ class Interpreter:
         raise ValueError(f"Operación no soportada: {type(izquierda)} {operacion.operador} {type(derecha)}")
         
         
-
     def evaluar_expresion(self, expr, debug=False):
         if debug:
             print(f"Evaluando expresión: {expr}")
@@ -75,17 +74,47 @@ class Interpreter:
             if expr.nombre not in self.memoria:
                 raise NameError(f"Variable no definida: '{expr.nombre}'")
             return self.memoria[expr.nombre]
-        elif isinstance(expr, Cadena):  # Nuevo caso para cadenas
+        elif isinstance(expr, Cadena):
             return expr.valor
-        elif isinstance(expr, OperacionBinaria) and expr.operador == '+':
+        elif isinstance(expr, OperacionBinaria):
             izquierda = self.evaluar_expresion(expr.izquierda, debug)
             derecha = self.evaluar_expresion(expr.derecha, debug)
+            
             if debug:
                 print(f"Operación: {izquierda} {expr.operador} {derecha}")
-            return str(izquierda) + str(derecha)
+            
+            # Operaciones aritméticas
+            if expr.operador == '+':
+                if isinstance(izquierda, (int, float)) and isinstance(derecha, (int, float)):
+                    return izquierda + derecha
+                return str(izquierda) + str(derecha)
+            elif expr.operador == '-':
+                return izquierda - derecha
+            elif expr.operador == '*':
+                return izquierda * derecha
+            elif expr.operador == '/':
+                return izquierda / derecha
+            # Operaciones de comparación
+            elif expr.operador == '<':
+                return izquierda < derecha
+            elif expr.operador == '<=':
+                return izquierda <= derecha
+            elif expr.operador == '>':
+                return izquierda > derecha
+            elif expr.operador == '>=':
+                return izquierda >= derecha
+            elif expr.operador == '=':
+                return izquierda == derecha
+            elif expr.operador == '<>':
+                return izquierda != derecha
+            else:
+                raise ValueError(f"Operador no soportado: {expr.operador}")
         else:
             raise ValueError(f"Tipo de expresión no soportada: {type(expr)}")
 
+
+
+    
     def imprimir_memoria(self):
         """Muestra las variables con colores"""
         if not self.memoria:

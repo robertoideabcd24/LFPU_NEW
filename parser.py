@@ -58,7 +58,7 @@ class Parser:
     def expresion(self):
         nodo = self.termino()
 
-        while self.posicion < len(self.tokens) and self.tokens[self.posicion][0] in ('SUMA', 'RESTA'):
+        while self.posicion < len(self.tokens) and self.tokens[self.posicion][0] in ('SUMA', 'RESTA', 'MENOR', 'MENOR_IGUAL', 'MAYOR', 'MAYOR_IGUAL', 'IGUAL', 'DIFERENTE'):
             operador = self.tokens[self.posicion][1]
             self.posicion += 1
             nodo = OperacionBinaria(nodo, operador, self.termino())
@@ -190,6 +190,9 @@ class Parser:
         elif token[0] == 'CADENA':
             self.posicion += 1
             return Cadena(token[1])
+        elif token[0] == 'BOOLEANO':
+            self.posicion += 1
+            return Booleano(token[1])
         elif token[0] == 'PAREN_IZQ':
             self.posicion += 1
             nodo = self.expresion()

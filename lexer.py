@@ -173,6 +173,16 @@ class Lexer:
                 if self.caracter_actual == '"':
                     return self.cadena()
                 
+                # Agregar reconocimiento de booleanos
+                if self.caracter_actual.lower() == 't' and self.texto_entrada[self.posicion:self.posicion+4].lower() == 'true':
+                    self.posicion += 4
+                    self.caracter_actual = self.texto_entrada[self.posicion] if self.posicion < len(self.texto_entrada) else None
+                    return ('BOOLEANO', True)
+                    
+                if self.caracter_actual.lower() == 'f' and self.texto_entrada[self.posicion:self.posicion+5].lower() == 'false':
+                    self.posicion += 5
+                    self.caracter_actual = self.texto_entrada[self.posicion] if self.posicion < len(self.texto_entrada) else None
+                    return ('BOOLEANO', False)
 
                 
                 # Manejo robusto de :=

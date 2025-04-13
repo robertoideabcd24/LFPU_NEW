@@ -30,6 +30,7 @@ def _imprimir_nodo(node, prefijo, es_ultimo):
         print(f"Asignacion({node.nombre_var} = ...)")
         nuevo_prefijo = prefijo + ("    " if es_ultimo else "│   ")
         _imprimir_nodo(node.valor, nuevo_prefijo, True)
+    # En la función _imprimir_nodo:
     elif isinstance(node, OperacionBinaria):
         print(f"OperacionBinaria({node.operador})")
         nuevo_prefijo = prefijo + ("    " if es_ultimo else "│   ")

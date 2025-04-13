@@ -43,3 +43,10 @@ class Cadena:
     
     def __repr__(self):
         return f"Cadena('{self.valor}')"
+    
+class Booleano:
+    def __init__(self, valor):
+        self.valor = valor
+    
+    def __repr__(self):
+        return f"Booleano({self.valor})"

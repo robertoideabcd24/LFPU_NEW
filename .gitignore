@@ -1,0 +1,9 @@
+# Ignorar carpetas de pruebas
+tests/
+tests2/
+
+# Ignorar archivos con extensión .flup
+*.flup
+
+# Ignorar scripts de shell
+*.sh
