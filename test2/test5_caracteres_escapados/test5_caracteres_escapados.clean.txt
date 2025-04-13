@@ -1,0 +1,3 @@
+Hola
+Mundo	!
+msg: 'Hola\nMundo\t!'

@@ -70,7 +70,7 @@ def modo_interactivo():
                 if empty_line_count >= 2:  # Doble Enter
                     print(f"\n{Colors.TITULO}=== Memoria ==={Colors.RESET}")
                     interprete.imprimir_memoria()
-                    print()  # Salto de línea adicional
+                    #print()  # Salto de línea adicional
                     empty_line_count = 0
                 continue
             else:
@@ -153,7 +153,7 @@ def modo_script(archivo, debug=False):
         interprete = Interpreter()
         interprete.ejecutar(ast, debug=debug)
         
-        print(f"\n{Colors.CYAN}=== Estado final de variables ==={Colors.RESET}")
+        #print(f"\n{Colors.CYAN}=== Estado final de variables ==={Colors.RESET}")
         interprete.imprimir_memoria()
         
     except Exception as e:

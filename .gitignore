@@ -1,0 +1,9 @@
+# Ignorar archivos .sh
+*.sh
+
+# Ignorar archivos .flup
+*.flup
+
+# Ignorar carpetas test y tests2
+test/
+tests2/
