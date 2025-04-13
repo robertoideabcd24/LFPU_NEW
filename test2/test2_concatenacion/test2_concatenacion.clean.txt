@@ -1,3 +1,0 @@
-El valor de a es: 42
-
-a: 42

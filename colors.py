@@ -15,5 +15,3 @@ class Colors:
     EXITO = '\033[1;32m'       # Verde negrita para mensajes positivos
 
     PRINT = '\033[38;5;213m'  # Color morado claro para Prt
-
-    CADENA = '\033[93m'  # Amarillo para cadenas

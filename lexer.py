@@ -170,13 +170,10 @@ class Lexer:
                 if self.caracter_actual.isdigit() or self.caracter_actual == '.':
                     return self.numero()
                 
-                # Manejo de cadenas (prioridad máxima)
                 if self.caracter_actual == '"':
-                    self.avanzar()
-                    return self.procesar_cadena('"')
-                if self.caracter_actual == "'":
-                    self.avanzar()
-                    return self.procesar_cadena("'")
+                    return self.cadena()
+                
+
                 
                 # Manejo robusto de :=
                 if self.caracter_actual == ':':
@@ -210,36 +207,30 @@ class Lexer:
     def get_line_number(self, pos):
         return self.texto_entrada.count('\n', 0, pos) + 1
     
-    def procesar_cadena(self, delimitador):
-        """Procesa strings y devuelve tokens en formato (tipo, valor)"""
-        resultado = []
-        while self.caracter_actual != delimitador:
+    def cadena(self):
+        resultado = ''
+        self.avanzar()  # Saltar la comilla inicial
+        
+        while self.caracter_actual is not None and self.caracter_actual != '"':
+            # Manejar caracteres escapados
             if self.caracter_actual == '\\':
                 self.avanzar()
                 if self.caracter_actual == 'n':
-                    resultado.append('\n')
+                    resultado += '\n'
                 elif self.caracter_actual == 't':
-                    resultado.append('\t')
-                elif self.caracter_actual == '\\':
-                    resultado.append('\\')
-                elif self.caracter_actual == delimitador:
-                    resultado.append(delimitador)
+                    resultado += '\t'
                 else:
-                    raise SyntaxError(f"Secuencia de escape inválida: \\{self.caracter_actual}")
+                    resultado += self.caracter_actual
                 self.avanzar()
             else:
-                resultado.append(self.caracter_actual)
+                resultado += self.caracter_actual
                 self.avanzar()
-        self.avanzar()  # Consumir delimitador final
-        return ('CADENA', ''.join(resultado))  # <-- Asegurar que devuelve (tipo, valor)
-    
-    def debug_str(s):
-        """Convierte strings para visualización en debug"""
-        return (s.replace('\\', '\\\\')
-            .replace('\n', '\\n')
-            .replace('\t', '\\t')
-            .replace('\'', '\\\'')
-            .replace('\"', '\\"'))
+        
+        if self.caracter_actual != '"':
+            raise SyntaxError("Cadena sin cerrar")
+        
+        self.avanzar()  # Saltar la comilla final
+        return ('CADENA', resultado)
 
     def tokenizar(self):
         tokens = []
@@ -249,19 +240,15 @@ class Lexer:
             if token is None:
                 break
                 
-            # Verificar que el token sea una tupla (tipo, valor)
-            if not isinstance(token, tuple) or len(token) != 2:
-                if self.debug:
-                    print(f"Token mal formado ignorado: {token}")
+            if token[0] in ('EOF', 'FIN_ARCHIVO'):
+                break
+                
+            if token[0] == 'ERROR':
+                print(f"Error léxico: {token[1]}")
                 continue
                 
-            tipo, valor = token  # Desempaquetado seguro
-            tokens.append((tipo, valor))
+            tokens.append(token)
+            if self.debug:  # Solo mostrar tokens en modo debug
+                print(f"Token reconocido: {token}")
             
-            if self.debug:
-                if tipo == 'CADENA':
-                    print(f"Token reconocido: ('CADENA', {repr(valor)})")
-                else:
-                    print(f"Token reconocido: {token}")
-                    
         return tokens

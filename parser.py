@@ -56,21 +56,26 @@ class Parser:
             raise SyntaxError("Expresión incompleta en Prt")
 
     def expresion(self):
-        """Expresión que maneja suma/resta después de términos"""
         nodo = self.termino()
+
         while self.posicion < len(self.tokens) and self.tokens[self.posicion][0] in ('SUMA', 'RESTA'):
             operador = self.tokens[self.posicion][1]
             self.posicion += 1
             nodo = OperacionBinaria(nodo, operador, self.termino())
+
         return nodo
 
     def termino(self):
-        """Término que maneja multiplicación/división después de factores"""
         nodo = self.factor()
+
         while self.posicion < len(self.tokens) and self.tokens[self.posicion][0] in ('MULT', 'DIV'):
-            operador = self.tokens[self.posicion][1]
-            self.posicion += 1
-            nodo = OperacionBinaria(nodo, operador, self.factor())
+            token = self.tokens[self.posicion]
+            if token[0] == 'MULT':
+                self.posicion += 1
+                nodo = OperacionBinaria(nodo, '*', self.factor())
+            elif token[0] == 'DIV':
+                self.posicion += 1
+                nodo = OperacionBinaria(nodo, '/', self.factor())
         return nodo
     
     def bloque(self):

@@ -1,6 +1,0 @@
-x: 10, y: hola, z: -3
-
-=== Estado final de variables ===
-x: 10
-y: 'hola'
-z: -3
