@@ -52,7 +52,7 @@ def _imprimir_nodo(node, prefijo, es_ultimo):
 
 def modo_interactivo():
     """Modo consola interactiva mejorado"""
-    print(f"{Colors.TITULO}Bienvenido a FLUP v1.0 - Modo interactivo{Colors.RESET}")
+    print(f"{Colors.TITULO}Bienvenido a FLUP v1.0 - Modo interactivo (Abril de 2025) {Colors.RESET}")
     #print(f"Escribe {Colors.EXITO}exit{Colors.RESET} para terminar")
     #print(f"Presiona {Colors.EXITO}Enter dos veces{Colors.RESET} para mostrar variables\n")
     

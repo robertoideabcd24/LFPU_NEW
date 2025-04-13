@@ -136,6 +136,14 @@ class Lexer:
                     self.avanzar()
                     return ('IGUAL', '=')
                 
+                if self.caracter_actual == '!':
+                    self.avanzar()
+                    if self.caracter_actual == '=':
+                        self.avanzar()
+                        return ('DIFERENTE', '!=')
+                    else:
+                        self.error()
+                
                 if self.caracter_actual == '.':
                     self.avanzar()
                     return ('PUNTO', '.')

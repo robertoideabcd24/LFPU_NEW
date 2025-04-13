@@ -105,7 +105,7 @@ class Interpreter:
                 return izquierda >= derecha
             elif expr.operador == '=':
                 return izquierda == derecha
-            elif expr.operador == '<>':
+            elif expr.operador in ('!=', '<>'):
                 return izquierda != derecha
             else:
                 raise ValueError(f"Operador no soportado: {expr.operador}")
