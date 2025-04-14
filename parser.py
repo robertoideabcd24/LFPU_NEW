@@ -1,4 +1,4 @@
-from base import Numero, Variable, OperacionBinaria, Asignacion, Prt, Cadena
+from base import Numero, Variable, OperacionBinaria, Asignacion, Prt, Cadena, OperacionUnaria, Booleano
 class Parser:
     def __init__(self, tokens):
         self.tokens = tokens
@@ -64,6 +64,46 @@ class Parser:
             nodo = OperacionBinaria(nodo, operador, self.termino())
 
         return nodo
+    
+    def expresion_comparacion(self):
+        nodo = self.termino()
+        
+        while self.posicion < len(self.tokens) and self.tokens[self.posicion][0] in (
+            'MENOR', 'MENOR_IGUAL', 'MAYOR', 'MAYOR_IGUAL', 'IGUAL_IGUAL', 'DIFERENTE'
+        ):
+            operador = self.tokens[self.posicion][1]
+            self.posicion += 1
+            nodo = OperacionBinaria(nodo, operador, self.termino())
+        
+        return nodo
+    
+    def expresion_or(self):
+        nodo = self.expresion_and()
+        
+        while self.posicion < len(self.tokens) and self.tokens[self.posicion][0] == 'OR':
+            operador = self.tokens[self.posicion][1]
+            self.posicion += 1
+            nodo = OperacionBinaria(nodo, operador, self.expresion_and())
+        
+        return nodo
+
+    def expresion_and(self):
+        nodo = self.expresion_not()
+        
+        while self.posicion < len(self.tokens) and self.tokens[self.posicion][0] == 'AND':
+            operador = self.tokens[self.posicion][1]
+            self.posicion += 1
+            nodo = OperacionBinaria(nodo, operador, self.expresion_not())
+        
+        return nodo
+
+    def expresion_not(self):
+        if self.posicion < len(self.tokens) and self.tokens[self.posicion][0] == 'NOT':
+            operador = self.tokens[self.posicion][1]
+            self.posicion += 1
+            expresion = self.expresion_not()  # Cambiado de recursión a expresion_comparacion
+            return OperacionUnaria(operador, expresion)
+        return self.expresion_comparacion()
 
     def termino(self):
         nodo = self.factor()
@@ -107,28 +147,30 @@ class Parser:
         
         return declaraciones
     
+    
     def declaracion_asignacion(self):
         try:
             if self.posicion + 1 >= len(self.tokens):
                 raise SyntaxError("Asignación incompleta al final del archivo")
             
-             # Buscar el token de asignación ignorando espacios
+            # Buscar el token de asignación ignorando espacios
             next_pos = self.posicion + 1
-            while next_pos < len(self.tokens) and self.tokens[next_pos][0].isspace():
+            while next_pos < len(self.tokens) and self.tokens[next_pos][0] == 'PUNTO_COMA':
                 next_pos += 1
                 
             if (self.tokens[self.posicion][0] == 'ID' and 
-            next_pos < len(self.tokens) and 
-            self.tokens[next_pos][0] == 'ASIGNACION'):
+                next_pos < len(self.tokens) and 
+                self.tokens[next_pos][0] == 'ASIGNACION'):
             
                 nombre_var = self.tokens[self.posicion][1]
-                self.posicion = next_pos + 1  # Saltar ID y ASIGNACION (ignorando espacios)
+                self.posicion = next_pos + 1  # Saltar ID y ASIGNACION
                 
                 # Verificar que hay tokens suficientes para la expresión
                 if self.posicion >= len(self.tokens):
                     raise SyntaxError("Expresión faltante después de asignación")
                     
-                expresion = self.expresion()
+                # Cambiar esto para usar expresion() que maneja operadores lógicos
+                expresion = self.expresion_or()  # Usamos expresion_or() que es el nivel más alto de la jerarquía
                 
                 # Verificar punto y coma
                 if self.posicion >= len(self.tokens) or self.tokens[self.posicion][0] != 'PUNTO_COMA':
@@ -140,6 +182,7 @@ class Parser:
             return None
         except IndexError as e:
             raise SyntaxError(f"Error de sintaxis: estructura incompleta - {str(e)}")
+
 
     def get_line_number(self, token_pos):
         """

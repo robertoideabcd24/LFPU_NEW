@@ -59,6 +59,9 @@ class Lexer:
 
         reservadas = {
             'prt': 'PRT',
+            'and': 'AND',
+            'or': 'OR',
+            'not': 'NOT'
         }
         
         return (reservadas.get(resultado.lower(), 'ID'), resultado)
@@ -134,7 +137,11 @@ class Lexer:
                 
                 if self.caracter_actual == '=':
                     self.avanzar()
-                    return ('IGUAL', '=')
+                    if self.caracter_actual == '=':  # Operador de comparación ==
+                        self.avanzar()
+                        return ('IGUAL_IGUAL', '==')
+                    else:
+                        return ('IGUAL', '=')
                 
                 if self.caracter_actual == '!':
                     self.avanzar()
@@ -143,6 +150,21 @@ class Lexer:
                         return ('DIFERENTE', '!=')
                     else:
                         self.error()
+
+                if self.caracter_actual.lower() == 'a' and self.texto_entrada[self.posicion:self.posicion+3].lower() == 'and':
+                    self.posicion += 3
+                    self.caracter_actual = self.texto_entrada[self.posicion] if self.posicion < len(self.texto_entrada) else None
+                    return ('AND', 'and')
+
+                if self.caracter_actual.lower() == 'o' and self.texto_entrada[self.posicion:self.posicion+2].lower() == 'or':
+                    self.posicion += 2
+                    self.caracter_actual = self.texto_entrada[self.posicion] if self.posicion < len(self.texto_entrada) else None
+                    return ('OR', 'or')
+
+                if self.caracter_actual.lower() == 'n' and self.texto_entrada[self.posicion:self.posicion+3].lower() == 'not':
+                    self.posicion += 3
+                    self.caracter_actual = self.texto_entrada[self.posicion] if self.posicion < len(self.texto_entrada) else None
+                    return ('NOT', 'not')
                 
                 if self.caracter_actual == '.':
                     self.avanzar()

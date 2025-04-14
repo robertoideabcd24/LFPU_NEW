@@ -50,3 +50,11 @@ class Booleano:
     
     def __repr__(self):
         return f"Booleano({self.valor})"
+    
+class OperacionUnaria:
+    def __init__(self, operador, expresion):
+        self.operador = operador
+        self.expresion = expresion
+
+    def __repr__(self):
+        return f"OperacionUnaria({self.operador} {self.expresion})"

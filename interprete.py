@@ -1,4 +1,4 @@
-from base import Numero, Variable, OperacionBinaria, Asignacion, Prt, Cadena
+from base import Numero, Variable, OperacionBinaria, Asignacion, Prt, Cadena, OperacionUnaria, Booleano
 from colors import Colors
 
 class Interpreter:
@@ -107,11 +107,27 @@ class Interpreter:
                 return izquierda == derecha
             elif expr.operador in ('!=', '<>'):
                 return izquierda != derecha
+            elif expr.operador == '==':
+                return izquierda == derecha
+            # Operaciones lógicas
+            elif expr.operador == 'and':
+                return izquierda and derecha
+            elif expr.operador == 'or':
+                return izquierda or derecha
+            elif expr.operador == 'not':
+                return izquierda or derecha
             else:
                 raise ValueError(f"Operador no soportado: {expr.operador}")
+        elif isinstance(expr, OperacionUnaria):
+            valor = self.evaluar_expresion(expr.expresion, debug)
+            if debug:
+                print(f"Operación unaria: {expr.operador} {valor}")
+            if expr.operador == 'not':
+                return not valor
+            else:
+                raise ValueError(f"Operador unario no soportado: {expr.operador}")
         else:
             raise ValueError(f"Tipo de expresión no soportada: {type(expr)}")
-
 
 
     
