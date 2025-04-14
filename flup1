@@ -3,10 +3,10 @@ import sys
 import os
 import readline  
 from lexer import Lexer
-from parser import Parser, Asignacion, OperacionBinaria, Numero, Variable
+from parser import Parser, Asignacion, OperacionBinaria, Numero, Variable, Cadena, Prt, Bloque, If
 from interprete import Interpreter
 from colors import Colors
-from base import Asignacion, OperacionBinaria, Numero, Variable, Cadena, Prt 
+from base import Asignacion, OperacionBinaria, Numero, Variable, Cadena, Prt, Bloque, If 
 
 # Función para imprimir el árbol de sintaxis
 def imprimir_arbol_sintaxis(nodes):
@@ -46,6 +46,12 @@ def _imprimir_nodo(node, prefijo, es_ultimo):
         print(f"Prt(...)")
         nuevo_prefijo = prefijo + ("    " if es_ultimo else "│   ")
         _imprimir_nodo(node.expresion, nuevo_prefijo, True)
+    elif isinstance(node, If):
+        print(f"If(condición: {node.condicion})")
+        nuevo_prefijo = prefijo + ("    " if es_ultimo else "│   ")
+        print(nuevo_prefijo + "└── Cuerpo:")
+        for i, decl in enumerate(node.cuerpo):
+            _imprimir_nodo(decl, nuevo_prefijo + "    ", i == len(node.cuerpo)-1)
     else:
         print(f"Tipo de nodo desconocido: {type(node)}")
 
@@ -157,9 +163,11 @@ def modo_script(archivo, debug=False):
         
         print(f"\n{Colors.CYAN}=== Estado final de variables ==={Colors.RESET}")
         interprete.imprimir_memoria()
-        
+        print(f"\n{Colors.EXITO}✓ Ejecución completada exitosamente{Colors.RESET}")
+
     except Exception as e:
-        print(f"{Colors.FAIL}ERROR:{Colors.RESET} {str(e)}")
+        print(f"\n{Colors.FAIL}✗ Error durante la ejecución:{Colors.RESET}")
+        print(f"{str(e)}")
         if debug:
             import traceback
             traceback.print_exc()

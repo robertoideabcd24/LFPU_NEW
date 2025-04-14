@@ -58,3 +58,25 @@ class OperacionUnaria:
 
     def __repr__(self):
         return f"OperacionUnaria({self.operador} {self.expresion})"
+    
+class If:
+    def __init__(self, condicion, cuerpo, elifs=None, else_cuerpo=None):
+        self.condicion = condicion
+        self.cuerpo = cuerpo
+        self.elifs = elifs if elifs is not None else []
+        self.else_cuerpo = else_cuerpo
+
+    def __repr__(self):
+        parts = [f"If({self.condicion}): {self.cuerpo}"]
+        for cond, cuerpo in self.elifs:
+            parts.append(f"Elif({cond}): {cuerpo}")
+        if self.else_cuerpo:
+            parts.append(f"Else: {self.else_cuerpo}")
+        return "\n".join(parts)
+
+class Bloque:
+    def __init__(self, declaraciones):
+        self.declaraciones = declaraciones
+    
+    def __repr__(self):
+        return f"Bloque({self.declaraciones})"

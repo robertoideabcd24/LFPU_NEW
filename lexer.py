@@ -61,7 +61,10 @@ class Lexer:
             'prt': 'PRT',
             'and': 'AND',
             'or': 'OR',
-            'not': 'NOT'
+            'not': 'NOT',
+            'if': 'IF',
+            'eli': 'ELIF',
+            'els': 'ELSE',
         }
         
         return (reservadas.get(resultado.lower(), 'ID'), resultado)
@@ -69,8 +72,9 @@ class Lexer:
     def obtener_siguiente_token(self):
         try:
             while self.caracter_actual is not None:
-                if self.caracter_actual.isspace():
-                    self.saltar_espacios()
+                # Manejar espacios en blanco
+                if self.caracter_actual in (' ', '\t'):
+                    self.avanzar()
                     continue
 
                 if self.caracter_actual.isdigit():
@@ -104,13 +108,18 @@ class Lexer:
                     self.avanzar()
                     return ('DIV', '/')
 
+                # Manejar dos puntos
                 if self.caracter_actual == ':':
+                    start_pos = self.posicion
                     self.avanzar()
                     if self.caracter_actual == '=':
                         self.avanzar()
                         return ('ASIGNACION', ':=')
                     else:
-                        self.error()
+                        # Retroceder para manejar solo ':' 
+                        self.posicion = start_pos
+                        self.avanzar()
+                        return ('DOS_PUNTOS', ':')
 
                 if self.caracter_actual == ';':
                     self.avanzar()
@@ -213,7 +222,16 @@ class Lexer:
                     self.posicion += 5
                     self.caracter_actual = self.texto_entrada[self.posicion] if self.posicion < len(self.texto_entrada) else None
                     return ('BOOLEANO', False)
-
+                
+                # Manejar saltos de línea
+                if self.caracter_actual == '\n':
+                    self.avanzar()
+                    # Contar espacios para indentación
+                    espacios = 0
+                    while self.caracter_actual == ' ':
+                        espacios += 1
+                        self.avanzar()
+                    return ('NUEVA_LINEA', '\n')
                 
                 # Manejo robusto de :=
                 if self.caracter_actual == ':':

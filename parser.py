@@ -1,4 +1,4 @@
-from base import Numero, Variable, OperacionBinaria, Asignacion, Prt, Cadena, OperacionUnaria, Booleano
+from base import Numero, Variable, OperacionBinaria, Asignacion, Prt, Cadena, OperacionUnaria, Booleano, If, Bloque
 class Parser:
     def __init__(self, tokens):
         self.tokens = tokens
@@ -9,15 +9,25 @@ class Parser:
         while self.posicion < len(self.tokens):
             token_actual = self.tokens[self.posicion]
             
-            if token_actual[0] == 'ID':
-                declaracion = self.declaracion_asignacion()
-            elif token_actual[0] == 'PRT':
-                declaracion = self.declaracion_prt()
-            elif token_actual[0] == 'PUNTO_COMA':
+            # Saltar tokens de formato
+            if token_actual[0] in ('NUEVA_LINEA', 'ESPACIO', 'TAB', 'PUNTO_COMA'):
                 self.posicion += 1
                 continue
+                
+            # Procesar declaraciones
+            if token_actual[0] == 'ID':
+                # Verificar si es asignación (siguiente token es ASIGNACION)
+                if self.posicion + 1 < len(self.tokens) and self.tokens[self.posicion + 1][0] == 'ASIGNACION':
+                    declaracion = self.declaracion_asignacion()
+                else:
+                    declaracion = None
+            elif token_actual[0] == 'PRT':
+                declaracion = self.declaracion_prt()
+            elif token_actual[0] == 'IF':
+                declaracion = self.declaracion_if()
             else:
-                break
+                self.posicion += 1
+                continue
                 
             if declaracion:
                 declaraciones.append(declaracion)
@@ -29,38 +39,30 @@ class Parser:
             
         self.posicion += 1  # Consumir 'Prt'
         
-        try:
-            if self.posicion >= len(self.tokens) or self.tokens[self.posicion][0] != 'PAREN_IZQ':
-                raise SyntaxError("Se esperaba '(' después de Prt")
-                
-            self.posicion += 1  # Consumir '('
+        # Verificar paréntesis de apertura
+        if self.tokens[self.posicion][0] != 'PAREN_IZQ':
+            raise SyntaxError("Se esperaba '(' después de Prt")
+        self.posicion += 1
+        
+        expresion = self.expresion()
+        
+        # Verificar paréntesis de cierre
+        if self.tokens[self.posicion][0] != 'PAREN_DER':
+            raise SyntaxError("Se esperaba ')' después de expresión en Prt")
+        self.posicion += 1
+        
+        # Verificar punto y coma final si existe
+        if self.posicion < len(self.tokens) and self.tokens[self.posicion][0] == 'PUNTO_COMA':
+            self.posicion += 1
             
-            if self.posicion >= len(self.tokens):
-                raise SyntaxError("Expresión faltante después de Prt")
-                
-            expresion = self.expresion()
-            expresion = self.optimizar_concatenacion(expresion)
-            
-            if self.posicion >= len(self.tokens) or self.tokens[self.posicion][0] != 'PAREN_DER':
-                raise SyntaxError("Se esperaba ')' después de la expresión en Prt")
-                
-            self.posicion += 1  # Consumir ')'
-            
-            if self.posicion >= len(self.tokens) or self.tokens[self.posicion][0] != 'PUNTO_COMA':
-                raise SyntaxError("Se esperaba ';' al final de la instrucción Prt")
-                
-            self.posicion += 1  # Consumir ';'
-            return Prt(expresion)
-            
-        except IndexError:
-            raise SyntaxError("Expresión incompleta en Prt")
+        return Prt(expresion)
 
     def expresion(self):
         nodo = self.termino()
 
         while self.posicion < len(self.tokens) and self.tokens[self.posicion][0] in ('SUMA', 'RESTA', 'MENOR', 'MENOR_IGUAL', 'MAYOR', 'MAYOR_IGUAL', 'IGUAL', 'DIFERENTE'):
             operador = self.tokens[self.posicion][1]
-            self.posicion += 1
+            self.posicion += 1  # Avanzar después del operador
             nodo = OperacionBinaria(nodo, operador, self.termino())
 
         return nodo
@@ -120,18 +122,30 @@ class Parser:
     
     def bloque(self):
         declaraciones = []
+        # Saltar líneas vacías al inicio
+        while self.posicion < len(self.tokens) and self.tokens[self.posicion][0] == 'NUEVA_LINEA':
+            self.posicion += 1
+        
+        # Procesar declaraciones hasta encontrar una línea no indentada
         while self.posicion < len(self.tokens):
             token_actual = self.tokens[self.posicion]
             
-            if token_actual[0] == 'ID':
-                declaracion = self.declaracion_asignacion()
+            # Fin del bloque cuando encontramos una línea vacía o menos indentada
+            if token_actual[0] == 'NUEVA_LINEA':
+                self.posicion += 1
+                # Verificar si la siguiente línea está menos indentada
+                break
+                
+            # Parsear declaraciones
+            if token_actual[0] == 'PRT':
+                declaracion = self.declaracion_prt()
                 if declaracion:
                     declaraciones.append(declaracion)
-            elif token_actual[0] == ';':
+            elif token_actual[0] == 'PUNTO_COMA':
                 self.posicion += 1
             else:
-                self.posicion += 1
-        
+                break
+                
         return declaraciones
     
     def procesar_bloque(self):
@@ -150,36 +164,25 @@ class Parser:
     
     def declaracion_asignacion(self):
         try:
-            if self.posicion + 1 >= len(self.tokens):
-                raise SyntaxError("Asignación incompleta al final del archivo")
+            if self.posicion >= len(self.tokens) or self.tokens[self.posicion][0] != 'ID':
+                return None
             
-            # Buscar el token de asignación ignorando espacios
-            next_pos = self.posicion + 1
-            while next_pos < len(self.tokens) and self.tokens[next_pos][0] == 'PUNTO_COMA':
-                next_pos += 1
-                
-            if (self.tokens[self.posicion][0] == 'ID' and 
-                next_pos < len(self.tokens) and 
-                self.tokens[next_pos][0] == 'ASIGNACION'):
+            nombre_var = self.tokens[self.posicion][1]
+            self.posicion += 1  # Consumir ID
             
-                nombre_var = self.tokens[self.posicion][1]
-                self.posicion = next_pos + 1  # Saltar ID y ASIGNACION
-                
-                # Verificar que hay tokens suficientes para la expresión
-                if self.posicion >= len(self.tokens):
-                    raise SyntaxError("Expresión faltante después de asignación")
-                    
-                # Cambiar esto para usar expresion() que maneja operadores lógicos
-                expresion = self.expresion_or()  # Usamos expresion_or() que es el nivel más alto de la jerarquía
-                
-                # Verificar punto y coma
-                if self.posicion >= len(self.tokens) or self.tokens[self.posicion][0] != 'PUNTO_COMA':
-                    raise SyntaxError("Se esperaba ';' después de asignación")
-                
+            # Verificar operador de asignación
+            if self.posicion >= len(self.tokens) or self.tokens[self.posicion][0] != 'ASIGNACION':
+                raise SyntaxError(f"Se esperaba ':=' después de '{nombre_var}'")
+            self.posicion += 1  # Consumir :=
+            
+            # Obtener la expresión del valor
+            valor = self.expresion()
+            
+            # Verificar punto y coma final si existe
+            if self.posicion < len(self.tokens) and self.tokens[self.posicion][0] == 'PUNTO_COMA':
                 self.posicion += 1
-                return Asignacion(nombre_var, expresion)
-            
-            return None
+                
+            return Asignacion(nombre_var, valor)
         except IndexError as e:
             raise SyntaxError(f"Error de sintaxis: estructura incompleta - {str(e)}")
 
@@ -214,6 +217,55 @@ class Parser:
             return OperacionBinaria(izquierda, nodo.operador, derecha)
         return nodo
 
+    def declaracion_if(self):
+        if self.posicion >= len(self.tokens) or self.tokens[self.posicion][0] != 'IF':
+            return None
+            
+        self.posicion += 1  # Consumir 'if'
+        
+        # Verificar paréntesis de apertura
+        if self.tokens[self.posicion][0] != 'PAREN_IZQ':
+            raise SyntaxError("Se esperaba '(' después de 'if'")
+        self.posicion += 1
+        
+        condicion = self.expresion_or()
+        
+        # Verificar paréntesis de cierre
+        if self.tokens[self.posicion][0] != 'PAREN_DER':
+            raise SyntaxError("Se esperaba ')' después de condición if")
+        self.posicion += 1
+        
+        # Verificar dos puntos
+        if self.tokens[self.posicion][0] != 'DOS_PUNTOS':
+            raise SyntaxError("Se esperaba ':' después de condición if")
+        self.posicion += 1
+        
+        # Saltar espacios y nuevas líneas
+        while self.posicion < len(self.tokens) and self.tokens[self.posicion][0] in ('NUEVA_LINEA', 'ESPACIO'):
+            self.posicion += 1
+        
+        # Procesar cuerpo del if
+        cuerpo = []
+        while self.posicion < len(self.tokens):
+            # Fin del bloque si encontramos una línea no indentada
+            if self.tokens[self.posicion][0] == 'NUEVA_LINEA':
+                self.posicion += 1
+                # Verificar si la siguiente línea está menos indentada
+                if self.posicion < len(self.tokens) and self.tokens[self.posicion][0] not in ('ESPACIO', 'TAB'):
+                    break
+                continue
+            
+            # Procesar declaración PRT
+            if self.tokens[self.posicion][0] == 'PRT':
+                prt_decl = self.declaracion_prt()
+                if prt_decl:
+                    cuerpo.append(prt_decl)
+            else:
+                break
+        
+        return If(condicion, cuerpo)
+
+    
 
     def factor(self):
         if self.posicion >= len(self.tokens):

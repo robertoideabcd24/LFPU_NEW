@@ -1,4 +1,4 @@
-from base import Numero, Variable, OperacionBinaria, Asignacion, Prt, Cadena, OperacionUnaria, Booleano
+from base import Numero, Variable, OperacionBinaria, Asignacion, Prt, Cadena, OperacionUnaria, If, Bloque
 from colors import Colors
 
 class Interpreter:
@@ -9,12 +9,11 @@ class Interpreter:
         ultimo_resultado = None
         for declaracion in ast:
             if isinstance(declaracion, Asignacion):
-                if debug:
-                    print(f"\nProcesando asignación: {declaracion.nombre_var}")
-                
                 valor = self.evaluar_expresion(declaracion.valor, debug)
                 self.memoria[declaracion.nombre_var] = valor
-                
+                if debug:
+                    print(f"[DEBUG] Asignado: {declaracion.nombre_var} = {valor}")
+            
                 if debug:
                     print(f"Asignación completada: {declaracion.nombre_var} = {valor}")
                 
@@ -22,6 +21,8 @@ class Interpreter:
             elif isinstance(declaracion, Prt):  # Nueva condición para Prt
                 resultado = self.evaluar_expresion(declaracion.expresion, debug)
                 print(resultado)
+            elif isinstance(declaracion, If):
+                self.evaluar_if(declaracion, debug)
         return ultimo_resultado
 
     def ejecutar_asignacion(self, asignacion):
@@ -116,6 +117,11 @@ class Interpreter:
                 return izquierda or derecha
             elif expr.operador == 'not':
                 return izquierda or derecha
+            # Condicionales
+            elif isinstance(expr, If):
+                return self.evaluar_if(expr, debug)
+            elif isinstance(expr, Bloque):
+                return self.evaluar_bloque(expr, debug)
             else:
                 raise ValueError(f"Operador no soportado: {expr.operador}")
         elif isinstance(expr, OperacionUnaria):
@@ -129,7 +135,30 @@ class Interpreter:
         else:
             raise ValueError(f"Tipo de expresión no soportada: {type(expr)}")
 
+    def evaluar_if(self, nodo_if, debug=False):
+        if debug:
+            print(f"\n[DEBUG] Evaluando condición IF: {nodo_if.condicion}")
+        
+        condicion = self.evaluar_expresion(nodo_if.condicion, debug)
+        
+        if debug:
+            print(f"[DEBUG] Resultado condición: {condicion}")
+            print(f"[DEBUG] Cuerpo IF contiene {len(nodo_if.cuerpo)} declaraciones")
+        
+        if condicion:
+            if debug:
+                print("[DEBUG] Ejecutando cuerpo IF")
+            for declaracion in nodo_if.cuerpo:
+                self.ejecutar([declaracion], debug)
+        
+        return None
+            
 
+    def evaluar_bloque(self, bloque, debug=False):
+        resultado = None
+        for declaracion in bloque.declaraciones:
+            resultado = self.ejecutar([declaracion], debug)
+        return resultado
     
     def imprimir_memoria(self):
         """Muestra las variables con colores"""
