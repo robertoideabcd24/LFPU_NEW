@@ -147,7 +147,7 @@ class Interpreter:
         
         if condicion:
             if debug:
-                print("[DEBUG] Ejecutando cuerpo IF")
+                print(f"[DEBUG] Ejecutando bloque if con {len(nodo_if.cuerpo)} declaraciones")
             for declaracion in nodo_if.cuerpo:
                 self.ejecutar([declaracion], debug)
         

@@ -1,6 +1,10 @@
 # Ignorar carpetas de pruebas
 tests/
 tests2/
+tests3/
+tests4/
+boot/
+demostracion/
 
 # Ignorar archivos con extensión .flup
 *.flup

@@ -13,6 +13,11 @@ class Parser:
             if token_actual[0] in ('NUEVA_LINEA', 'ESPACIO', 'TAB', 'PUNTO_COMA'):
                 self.posicion += 1
                 continue
+
+            # Saltar indentación a nivel raíz
+            if token_actual[0] == 'INDENTACION':
+                self.posicion += 1
+                continue
                 
             # Procesar declaraciones
             if token_actual[0] == 'ID':
@@ -25,6 +30,9 @@ class Parser:
                 declaracion = self.declaracion_prt()
             elif token_actual[0] == 'IF':
                 declaracion = self.declaracion_if()
+            elif token_actual[0] in ('NUEVA_LINEA', 'PUNTO_COMA'):
+                self.posicion += 1
+                continue
             else:
                 self.posicion += 1
                 continue
@@ -243,10 +251,24 @@ class Parser:
         # Saltar espacios y nuevas líneas
         while self.posicion < len(self.tokens) and self.tokens[self.posicion][0] in ('NUEVA_LINEA', 'ESPACIO'):
             self.posicion += 1
+
+        # Verificar indentación
+        if self.posicion >= len(self.tokens) or self.tokens[self.posicion][0] != 'INDENTACION':
+            raise SyntaxError("Se esperaba indentación después del if")
+        
+        nivel_indentacion = self.tokens[self.posicion][1]
+        self.posicion += 1
         
         # Procesar cuerpo del if
         cuerpo = []
         while self.posicion < len(self.tokens):
+            # Fin del bloque cuando la indentación disminuye
+            if self.tokens[self.posicion][0] == 'INDENTACION':
+                if self.tokens[self.posicion][1] < nivel_indentacion:
+                    break
+                if self.tokens[self.posicion][1] > nivel_indentacion:
+                    raise SyntaxError("Indentación inconsistente")
+                self.posicion += 1
             # Fin del bloque si encontramos una línea no indentada
             if self.tokens[self.posicion][0] == 'NUEVA_LINEA':
                 self.posicion += 1

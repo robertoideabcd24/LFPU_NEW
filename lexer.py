@@ -223,15 +223,16 @@ class Lexer:
                     self.caracter_actual = self.texto_entrada[self.posicion] if self.posicion < len(self.texto_entrada) else None
                     return ('BOOLEANO', False)
                 
-                # Manejar saltos de línea
+                # Manejar sangrías (espacios/tabs al inicio de línea)
                 if self.caracter_actual == '\n':
                     self.avanzar()
-                    # Contar espacios para indentación
                     espacios = 0
                     while self.caracter_actual == ' ':
                         espacios += 1
                         self.avanzar()
-                    return ('NUEVA_LINEA', '\n')
+                    if espacios > 0:
+                        return ('INDENTACION', espacios)
+                    continue
                 
                 # Manejo robusto de :=
                 if self.caracter_actual == ':':

@@ -2,11 +2,29 @@
 import sys
 import os
 import readline  
+import time
+import pexpect
 from lexer import Lexer
 from parser import Parser, Asignacion, OperacionBinaria, Numero, Variable, Cadena, Prt, Bloque, If
 from interprete import Interpreter
 from colors import Colors
 from base import Asignacion, OperacionBinaria, Numero, Variable, Cadena, Prt, Bloque, If 
+
+def escribir_como_humano(consola, texto, delay=0.03):
+    for char in texto:
+        consola.send(char)
+        sys.stdout.write(char)
+        sys.stdout.flush()
+        time.sleep(delay)
+    consola.sendline("")  # Simula Enter
+    print()  # Salto de línea en consola visual
+
+def imprimir_lento(texto, delay=0.01):
+    for char in texto:
+        sys.stdout.write(char)
+        sys.stdout.flush()
+        time.sleep(delay)
+    #print()
 
 # Función para imprimir el árbol de sintaxis
 def imprimir_arbol_sintaxis(nodes):
@@ -161,9 +179,9 @@ def modo_script(archivo, debug=False):
         interprete = Interpreter()
         interprete.ejecutar(ast, debug=debug)
         
-        print(f"\n{Colors.CYAN}=== Estado final de variables ==={Colors.RESET}")
-        interprete.imprimir_memoria()
-        print(f"\n{Colors.EXITO}✓ Ejecución completada exitosamente{Colors.RESET}")
+        #print(f"\n{Colors.CYAN}=== Estado final de variables ==={Colors.RESET}")
+        #interprete.imprimir_memoria()
+        #print(f"\n{Colors.EXITO}✓ Ejecución completada exitosamente{Colors.RESET}")
 
     except Exception as e:
         print(f"\n{Colors.FAIL}✗ Error durante la ejecución:{Colors.RESET}")
@@ -171,6 +189,90 @@ def modo_script(archivo, debug=False):
         if debug:
             import traceback
             traceback.print_exc()
+
+def ejecutar_como_bot(archivo):
+    """Ejecuta un script FLUP mostrando la memoria correctamente después de dos ENTERs"""
+    if not os.path.exists(archivo):
+        print(f"{Colors.FAIL}Error:{Colors.RESET} Archivo no encontrado")
+        return
+
+    print(f"{Colors.TITULO}FLUP V1 (Abril 2025) - Intérprete Interactivo BOOT GRF-3X.{Colors.RESET}")
+    print(f"{Colors.TITULO}Data Byte Fortress (México).{Colors.RESET}")
+
+    # Configurar proceso hijo
+    child = pexpect.spawn('./flup', encoding='utf-8', timeout=10)
+    child.setecho(False)  # Desactivar eco automático
+    child.setwinsize(40, 120)
+    
+    # Esperar prompt inicial
+    child.expect('flup>')
+    
+    empty_line_count = 0
+    in_memory_section = False
+    
+    with open(archivo, 'r') as f:
+        for line in f:
+            line = line.strip()
+            
+            # Mostrar prompt y simular tecleo (solo para líneas con contenido)
+            if line:
+                print(f"{Colors.VARIABLE}flup>{Colors.RESET} ", end='', flush=True)
+                for char in line:
+                    print(char, end='', flush=True)
+                    time.sleep(0.09)
+                print()
+            
+            # Enviar comando al intérprete
+            child.sendline(line)
+            
+            if not line:
+                empty_line_count += 1
+                
+                if empty_line_count == 2:
+                    try:
+                        # Enviar dos ENTERs y capturar la salida
+                        child.sendline('')
+                        child.sendline('')
+                        
+                        # Esperar la salida completa
+                        child.expect('flup>', timeout=2)
+                        child.expect('flup>', timeout=2)
+                        
+                        # Procesar la salida para extraer solo la memoria
+                        output = child.before
+                        if '=== Memoria ===' in output:
+                            print(f"\n{Colors.TITULO}=== Memoria ==={Colors.RESET}")
+                            # Extraer solo las líneas de variables
+                            mem_lines = [ln.strip() for ln in output.split('\n') 
+                                      if ln.strip() and '===' not in ln]
+                            print('\n'.join(mem_lines))
+                            print(f"{Colors.TITULO}==============={Colors.RESET}\n")
+                            
+                    except pexpect.TIMEOUT:
+                        print(f"{Colors.FAIL}Timeout al mostrar memoria{Colors.RESET}")
+                    except pexpect.EOF:
+                        print(f"{Colors.FAIL}El intérprete terminó inesperadamente{Colors.RESET}")
+                        break
+            else:
+                empty_line_count = 0
+                
+                try:
+                    # Capturar salida normal del comando
+                    child.expect('flup>', timeout=2)
+                    output = child.before.strip()
+                    if output:
+                        print(output)
+                except pexpect.TIMEOUT:
+                    print(f"{Colors.FAIL}Timeout esperando respuesta{Colors.RESET}")
+                except pexpect.EOF:
+                    print(f"{Colors.FAIL}El intérprete terminó inesperadamente{Colors.RESET}")
+                    break
+    
+    # Salir limpiamente
+    print(f"{Colors.VARIABLE}flup>{Colors.RESET} exit")
+    child.sendline('exit')
+    child.expect(pexpect.EOF)
+    print(f"{Colors.EXITO}Ejecución completada{Colors.RESET}")
 
 def main():
     try:
@@ -182,11 +284,17 @@ def main():
             modo_script(sys.argv[1])
         elif len(sys.argv) == 3 and sys.argv[1] == 'ast':
             modo_script(sys.argv[2], debug=True)
+        
+        elif len(sys.argv) == 3 and sys.argv[1] in ('bot', 'rob'):
+            ejecutar_como_bot(sys.argv[2])
+
         else:
             print("Uso:")
             print("  flup v1          - Modo interactivo")
             print("  flup script.flup - Ejecutar archivo")
             print("  flup ast script.flup - Modo depuración")
+            print("  flup bot script.flup     - Simulación con bot (sin duplicar)")
+            print("  flup rob script.flup     - Modo robot personalizado")
     except KeyboardInterrupt:
         print("\nEjecución interrumpida por el usuario")
     except Exception as e:
