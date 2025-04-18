@@ -4,6 +4,7 @@ from colors import Colors
 class Interpreter:
     def __init__(self):
         self.memoria = {}
+        self.silent_mode = False
 
     def ejecutar(self, ast, debug=False):
         ultimo_resultado = None
@@ -11,19 +12,15 @@ class Interpreter:
             if isinstance(declaracion, Asignacion):
                 valor = self.evaluar_expresion(declaracion.valor, debug)
                 self.memoria[declaracion.nombre_var] = valor
+                ultimo_resultado = valor
                 if debug:
                     print(f"[DEBUG] Asignado: {declaracion.nombre_var} = {valor}")
-            
-                if debug:
-                    print(f"Asignación completada: {declaracion.nombre_var} = {valor}")
-                
-                ultimo_resultado = valor
-            elif isinstance(declaracion, Prt):  # Nueva condición para Prt
+            elif isinstance(declaracion, Prt):
                 resultado = self.evaluar_expresion(declaracion.expresion, debug)
-                print(resultado)
+                print(resultado)  # Siempre mostrar Prt
             elif isinstance(declaracion, If):
                 self.evaluar_if(declaracion, debug)
-        return ultimo_resultado
+        return ultimo_resultado if not self.silent_mode else None
 
     def ejecutar_asignacion(self, asignacion):
         # Maneja tanto números directos como operaciones binarias
@@ -166,11 +163,13 @@ class Interpreter:
             print("(no hay variables definidas)")
             return
             
-        for var, valor in self.memoria.items():
-            # Determinar el tipo de valor para el color
+        max_len = max(len(var) for var in self.memoria.keys()) if self.memoria else 0
+        
+        for var, valor in sorted(self.memoria.items()):
+            var_padded = var.ljust(max_len)
             if isinstance(valor, (int, float)):
-                valor_str = f"{Colors.NUMERO}{valor}{Colors.RESET}"
+                print(f"{Colors.VARIABLE}{var_padded}{Colors.RESET}: {Colors.NUMERO}{valor}{Colors.RESET}")
+            elif isinstance(valor, bool):
+                print(f"{Colors.VARIABLE}{var_padded}{Colors.RESET}: {Colors.BOOL}{valor}{Colors.RESET}")
             else:
-                valor_str = str(valor)
-                
-            print(f"{Colors.VARIABLE}{var}{Colors.RESET}: {valor_str}")
+                print(f"{Colors.VARIABLE}{var_padded}{Colors.RESET}: {valor}")
