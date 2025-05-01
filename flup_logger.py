@@ -1,118 +1,127 @@
-# flup_logger.py
 import json
 import os
 from datetime import datetime
 import sys
 import traceback
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List, Union
 from pathlib import Path
+import uuid
 
 class BasicFlupLogger:
-    def __init__(self, log_dir: str = "flup_logs"):
+    def __init__(self, log_dir: str = "flup_logs", max_log_size: int = 5):
         """
-        Logger básico que guarda ejecuciones en archivos JSON.
+        Logger mejorado para FLUP con rotación de archivos.
         
         Args:
-            log_dir: Directorio donde se guardarán los logs (por defecto: flup_logs en el home del usuario)
+            log_dir: Directorio para logs (relativo al home del usuario)
+            max_log_size: Tamaño máximo en MB antes de rotar archivos
         """
-        # Definir la ruta base como el home del usuario
-        home_dir = str(Path.home())
-        self.log_dir = os.path.join(home_dir, log_dir)
-        
-        # Asegurarse de que el directorio existe
-        os.makedirs(self.log_dir, exist_ok=True)
-        
-        # Configuración básica
-        self.user = self._get_current_user()
+        self.log_dir = self._setup_log_dir(log_dir)
+        self.max_log_size = max_log_size * 1024 * 1024  # Convertir a bytes
         self.session_id = self._generate_session_id()
+        self.current_log_file = self._get_current_log_file()
         
+    def _setup_log_dir(self, log_dir: str) -> str:
+        """Configura el directorio de logs"""
+        log_path = Path.home() / log_dir
+        log_path.mkdir(exist_ok=True, parents=True)
+        return str(log_path)
+    
     def log_execution(
         self,
         source_code: str,
-        output: Optional[str] = None,
+        output: Optional[Union[str, List, Dict]] = None,
         error: Optional[Dict[str, Any]] = None,
-        metadata: Optional[Dict[str, Any]] = None
+        metadata: Optional[Dict[str, Any]] = None,
+        command_type: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        Registra una ejecución en el log.
+        Registra una ejecución con mejor manejo de tipos complejos.
         
         Args:
-            source_code: Código fuente ejecutado
-            output: Salida estándar generada
-            error: Mensaje de error (si ocurrió)
+            source_code: Código ejecutado
+            output: Salida generada (puede ser str, lista o dict)
+            error: Información de error
             metadata: Metadatos adicionales
-            
-        Returns:
-            Dict con el registro creado
+            command_type: Tipo de comando (print, assign, class, etc.)
         """
         log_entry = {
-            "timestamp": datetime.now().isoformat(),
-            "user": self.user,
+            "timestamp": datetime.utcnow().isoformat() + "Z",
             "session_id": self.session_id,
-            "source_code": source_code,
+            "command": source_code,
+            "type": command_type or "execution",
             "output": output,
             "error": self._format_error(error) if error else None,
             "metadata": metadata or {},
-            "system": {
-                "python_version": sys.version,
-                "platform": sys.platform,
-                "working_dir": os.getcwd()
-            }
+            "system": self._get_system_info()
         }
         
-        # Nombre del archivo basado en la fecha
-        log_file = os.path.join(
-            self.log_dir,
-            f"flup_{datetime.now().strftime('%Y%m%d')}.json"
-        )
-        
-        # Escribir el log (append al archivo)
-        with open(log_file, 'a', encoding='utf-8') as f:
-            f.write(json.dumps(log_entry, ensure_ascii=False) + '\n')
-            
+        self._write_log(log_entry)
         return log_entry
     
-    def _format_error(self, error: Dict[str, Any]) -> Dict[str, Any]:
-        """Formatea la información de error para el log"""
-        return {
-            "type": error.get("type"),
-            "message": error.get("message"),
-            "traceback": error.get("traceback")
-        }
-    
     def log_error(self, source_code: str, exception: Exception) -> Dict[str, Any]:
-        """
-        Registra un error en el log.
-        
-        Args:
-            source_code: Código que causó el error
-            exception: Excepción capturada
-            
-        Returns:
-            Dict con el registro de error
-        """
-        error_info = {
-            "type": type(exception).__name__,
-            "message": str(exception),
-            "traceback": traceback.format_exc()
-        }
+        """Registra errores con stack trace completo"""
+        exc_type = type(exception).__name__
         
         return self.log_execution(
             source_code=source_code,
-            error=error_info,
-            metadata={"success": False}
+            error={
+                "type": exc_type,
+                "message": str(exception),
+                "traceback": traceback.format_exc()
+            },
+            metadata={"success": False},
+            command_type="error"
         )
     
-    def _get_current_user(self) -> str:
-        """Obtiene el usuario actual del sistema"""
-        try:
-            return os.getlogin()
-        except:
-            try:
-                return os.getenv('USER') or os.getenv('USERNAME') or "unknown"
-            except:
-                return "unknown"
+    def _write_log(self, entry: Dict[str, Any]):
+        """Escribe el log manejando rotación de archivos"""
+        # Verificar tamaño del archivo actual
+        if os.path.exists(self.current_log_file):
+            file_size = os.path.getsize(self.current_log_file)
+            if file_size >= self.max_log_size:
+                self._rotate_log_file()
+        
+        # Escribir en formato JSONL (una línea por entrada)
+        with open(self.current_log_file, 'a', encoding='utf-8') as f:
+            json.dump(entry, f, ensure_ascii=False)
+            f.write('\n')
+    
+    def _rotate_log_file(self):
+        """Rota el archivo de log cuando alcanza el tamaño máximo"""
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        new_name = f"flup_{timestamp}_{uuid.uuid4().hex[:6]}.json"
+        os.rename(self.current_log_file, os.path.join(self.log_dir, new_name))
+        self.current_log_file = self._get_current_log_file()
+    
+    def _get_current_log_file(self) -> str:
+        """Obtiene el archivo de log actual basado en la fecha"""
+        return os.path.join(
+            self.log_dir,
+            f"flup_{datetime.now().strftime('%Y%m%d')}.jsonl"
+        )
     
     def _generate_session_id(self) -> str:
-        """Genera un ID único para la sesión actual"""
-        return f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{os.getpid()}"
+        """Genera un ID de sesión único"""
+        return f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{uuid.uuid4().hex[:8]}"
+    
+    def _get_system_info(self) -> Dict[str, Any]:
+        """Obtiene información del sistema"""
+        return {
+            "python": sys.version,
+            "platform": sys.platform,
+            "cwd": os.getcwd(),
+            "user": self._get_current_user()
+        }
+    
+    def _get_current_user(self) -> str:
+        """Obtiene el usuario actual"""
+        return os.getenv('USER') or os.getenv('USERNAME') or "unknown"
+    
+    def _format_error(self, error: Dict[str, Any]) -> Dict[str, Any]:
+        """Formatea la información de error"""
+        return {
+            "type": error.get("type"),
+            "message": error.get("message"),
+            "traceback": error.get("traceback", "").splitlines()
+        }

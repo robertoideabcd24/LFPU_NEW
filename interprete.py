@@ -1,4 +1,5 @@
 from base import Numero, Variable, OperacionBinaria, Asignacion, Prt, Cadena, OperacionUnaria, If, Bloque, Booleano, Clase, CreacionInstancia, InstanciaClase, ExitCommand, AsignacionAtributo
+from flup_logger import BasicFlupLogger, json
 from colors import Colors
 
 class Interpreter:
@@ -7,6 +8,7 @@ class Interpreter:
         self.clases = {}
         self.silent_mode = False
         self.running = True 
+        self.logger = BasicFlupLogger() 
 
     def ejecutar(self, ast, debug=False):
         self.debug = debug
@@ -17,10 +19,18 @@ class Interpreter:
             try:
 
                 if isinstance(nodo, Prt):
-                    # Evaluar la expresión y mostrar el resultado
                     valor = self.evaluar_expresion(nodo.expresion)
-                    if not self.silent_mode:  # Solo imprimir si no estamos en modo silencioso
+                    if not self.silent_mode:
                         print(valor)
+                    # Registrar en el log
+                    self.logger.log_execution(
+                        source_code=f"Prt({nodo.expresion})",
+                        output=str(valor),
+                        metadata={
+                            "type": "print",
+                            "memory_snapshot": self.memoria.copy()
+                        }
+                    )
                     continue
 
                 elif isinstance(nodo, Clase):
@@ -54,7 +64,16 @@ class Interpreter:
                         raise AttributeError(f"Atributo no existe: {nodo.atributo}")
                     
                     valor = self.evaluar_expresion(nodo.valor)
-                    instancia['__atributos__'][nodo.atributo] = valor
+                    self.memoria[nodo.nombre_var] = valor
+                    self.logger.log_execution(
+                        source_code=f"{nodo.nombre_var} := {nodo.valor}",
+                        output=f"{nodo.nombre_var} = {valor}",
+                        command_type="assignment",
+                        metadata={
+                            "variable": nodo.nombre_var,
+                            "value_type": type(valor).__name__
+                        }
+                    )
                     
                     if debug:
                         print(f"[DEBUG] Asignado {nodo.objeto}.{nodo.atributo} = {valor}")
@@ -246,3 +265,20 @@ class Interpreter:
                 print(f"{Colors.VARIABLE}{var_padded}{Colors.RESET}: {Colors.BOOL}{valor}{Colors.RESET}")
             else:
                 print(f"{Colors.VARIABLE}{var_padded}{Colors.RESET}: {valor}")
+
+
+    def show_recent_logs(self, lines=10):
+        """Muestra los últimos logs registrados"""
+        if not os.path.exists(self.logger.current_log_file):
+            print("No hay logs registrados")
+            return
+        
+        with open(self.logger.current_log_file, 'r', encoding='utf-8') as f:
+            all_lines = f.readlines()
+            for line in all_lines[-lines:]:
+                log_entry = json.loads(line)
+                print(f"[{log_entry['timestamp']}] {log_entry['command']}")
+                if log_entry['output']:
+                    print(f"  => {log_entry['output']}")
+                if log_entry['error']:
+                    print(f"  !!! ERROR: {log_entry['error']['message']}")
