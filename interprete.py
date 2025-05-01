@@ -1,26 +1,74 @@
-from base import Numero, Variable, OperacionBinaria, Asignacion, Prt, Cadena, OperacionUnaria, If, Bloque
+from base import Numero, Variable, OperacionBinaria, Asignacion, Prt, Cadena, OperacionUnaria, If, Bloque, Booleano, Clase, CreacionInstancia, InstanciaClase, ExitCommand, AsignacionAtributo
 from colors import Colors
 
 class Interpreter:
     def __init__(self):
         self.memoria = {}
+        self.clases = {}
         self.silent_mode = False
+        self.running = True 
 
     def ejecutar(self, ast, debug=False):
-        ultimo_resultado = None
-        for declaracion in ast:
-            if isinstance(declaracion, Asignacion):
-                valor = self.evaluar_expresion(declaracion.valor, debug)
-                self.memoria[declaracion.nombre_var] = valor
-                ultimo_resultado = valor
+        self.debug = debug
+        self.memoria = {}
+        self.clases = {}
+        
+        for nodo in ast:
+            try:
+                if isinstance(nodo, Clase):
+                    self.clases[nodo.nombre] = nodo
+                    if debug:
+                        print(f"[DEBUG] Clase definida: {nodo.nombre}")
+
+                elif isinstance(nodo, CreacionInstancia):
+                    if nodo.nombre_clase not in self.clases:
+                        raise NameError(f"Clase no definida: {nodo.nombre_clase}")
+                    
+                    # Crear instancia con atributos
+                    atributos = {a.nombre: None for a in self.clases[nodo.nombre_clase].atributos}
+                    self.memoria[nodo.nombre_instancia] = {
+                        '__clase__': nodo.nombre_clase,
+                        '__atributos__': atributos
+                    }
+                    
+                    if debug:
+                        print(f"[DEBUG] Instancia creada: {nodo.nombre_instancia}")
+
+                elif isinstance(nodo, AsignacionAtributo):
+                    if nodo.objeto not in self.memoria:
+                        raise NameError(f"Instancia no existe: {nodo.objeto}")
+                    
+                    instancia = self.memoria[nodo.objeto]
+                    
+                    # Verificar que el atributo existe
+                    clase = self.clases[instancia['__clase__']]
+                    if nodo.atributo not in [a.nombre for a in clase.atributos]:
+                        raise AttributeError(f"Atributo no existe: {nodo.atributo}")
+                    
+                    valor = self.evaluar_expresion(nodo.valor)
+                    instancia['__atributos__'][nodo.atributo] = valor
+                    
+                    if debug:
+                        print(f"[DEBUG] Asignado {nodo.objeto}.{nodo.atributo} = {valor}")
+
+                elif isinstance(nodo, Asignacion):
+                    valor = self.evaluar_expresion(nodo.valor)
+                    self.memoria[nodo.nombre_var] = valor
+                    
+                    if debug:
+                        print(f"[DEBUG] Asignado {nodo.nombre_var} = {valor}")
+
+            except Exception as e:
                 if debug:
-                    print(f"[DEBUG] Asignado: {declaracion.nombre_var} = {valor}")
-            elif isinstance(declaracion, Prt):
-                resultado = self.evaluar_expresion(declaracion.expresion, debug)
-                print(resultado)  # Siempre mostrar Prt
-            elif isinstance(declaracion, If):
-                self.evaluar_if(declaracion, debug)
-        return ultimo_resultado if not self.silent_mode else None
+                    print(f"[ERROR] {str(e)}")
+                raise e
+
+        if debug:
+            print("\n=== Memoria Final ===")
+            for k, v in self.memoria.items():
+                print(f"{k}: {v}")
+            print("====================")
+    
 
     def ejecutar_asignacion(self, asignacion):
         # Maneja tanto números directos como operaciones binarias
@@ -68,10 +116,27 @@ class Interpreter:
 
         if isinstance(expr, Numero):
             return expr.valor
-        elif isinstance(expr, Variable):
-            if expr.nombre not in self.memoria:
-                raise NameError(f"Variable no definida: '{expr.nombre}'")
-            return self.memoria[expr.nombre]
+        if isinstance(expr, Variable):
+        # Manejar acceso a atributos (ej: p.nombre)
+            if '.' in expr.nombre:
+                partes = expr.nombre.split('.')
+                if len(partes) != 2:
+                    raise SyntaxError("Sintaxis inválida para acceso a atributo")
+                
+                nombre_instancia, nombre_atributo = partes
+                if nombre_instancia not in self.memoria:
+                    raise NameError(f"Instancia no definida: '{nombre_instancia}'")
+                
+                instancia = self.memoria[nombre_instancia]
+                if not isinstance(instancia, InstanciaClase):
+                    raise TypeError(f"'{nombre_instancia}' no es una instancia de clase")
+                
+                return instancia.atributos.get(nombre_atributo)
+            else:
+                # Variable normal
+                if expr.nombre not in self.memoria:
+                    raise NameError(f"Variable no definida: '{expr.nombre}'")
+                return self.memoria[expr.nombre]
         elif isinstance(expr, Cadena):
             return expr.valor
         elif isinstance(expr, OperacionBinaria):
@@ -134,17 +199,17 @@ class Interpreter:
 
     def evaluar_if(self, nodo_if, debug=False):
         if debug:
-            print(f"\n[DEBUG] Evaluando condición IF: {nodo_if.condicion}")
+            print(f"\n[DEBUG] Evaluando condición If: {nodo_if.condicion}")
         
         condicion = self.evaluar_expresion(nodo_if.condicion, debug)
         
         if debug:
             print(f"[DEBUG] Resultado condición: {condicion}")
-            print(f"[DEBUG] Cuerpo IF contiene {len(nodo_if.cuerpo)} declaraciones")
+            print(f"[DEBUG] Cuerpo If contiene {len(nodo_if.cuerpo)} declaraciones")
         
         if condicion:
             if debug:
-                print(f"[DEBUG] Ejecutando bloque if con {len(nodo_if.cuerpo)} declaraciones")
+                print(f"[DEBUG] Ejecutando bloque If con {len(nodo_if.cuerpo)} declaraciones")
             for declaracion in nodo_if.cuerpo:
                 self.ejecutar([declaracion], debug)
         

@@ -32,7 +32,8 @@ class Asignacion:
     
 class Prt:
     def __init__(self, expresion):
-        self.expresion = expresion  # Ahora acepta una expresión completa
+        # para que acepte una expresión completa
+        self.expresion = expresion  
     
     def __repr__(self):
         return f"Prt({self.expresion})"
@@ -80,3 +81,67 @@ class Bloque:
     
     def __repr__(self):
         return f"Bloque({self.declaraciones})"
+    
+class Clase:
+    def __init__(self, nombre, atributos=None, metodos=None):
+        self.nombre = nombre
+        self.atributos = atributos or []
+        self.metodos = metodos or []
+
+    def __repr__(self):
+        return f"Clase({self.nombre}, atributos: {self.atributos})"
+
+class InstanciaClase:
+    def __init__(self, clase):
+        self.clase = clase
+        self.atributos = {nombre: None for nombre in clase.atributos}
+        # Inicializar atributos declarados en la clase
+        for atributo in clase.atributos:
+            self.atributos[atributo] = None
+    
+    def __repr__(self):
+        atribs = ', '.join(f"{k}={v}" for k, v in self.atributos.items())
+        return f"Instancia de {self.clase.nombre} con atributos {self.atributos}"
+    
+    def __getattr__(self, name):
+        if name in self.atributos:
+            if self.atributos[name] is None:
+                raise AttributeError(f"Atributo '{name}' no ha sido asignado")
+            return self.atributos[name]
+        raise AttributeError(f"La clase '{self.clase.nombre}' no tiene atributo '{name}'")
+    
+    def __setattr__(self, name, value):
+        if name in ['clase', 'atributos']:
+            super().__setattr__(name, value)
+        elif name in getattr(self, 'atributos', {}):
+            self.atributos[name] = value
+        else:
+            raise AttributeError(f"La clase '{self.clase.nombre}' no tiene atributo '{name}'")
+    
+class CreacionInstancia:
+    def __init__(self, nombre_instancia, nombre_clase):
+        self.nombre_instancia = nombre_instancia
+        self.nombre_clase = nombre_clase
+    
+    def __repr__(self):
+        return f"CreacionInstancia({self.nombre_instancia} := {self.nombre_clase}())"
+
+class ExitCommand:
+    def __repr__(self):
+        return "ExitCommand()"
+
+class Atributo:
+    def __init__(self, nombre):
+        self.nombre = nombre
+
+    def __repr__(self):
+        return f"Atributo(nombre='{self.nombre}')"
+
+class AsignacionAtributo:
+    def __init__(self, nombre_instancia, nombre_atributo, valor):
+        self.nombre_instancia = nombre_instancia
+        self.nombre_atributo = nombre_atributo
+        self.valor = valor
+    
+    def __repr__(self):
+        return f"AsignacionAtributo({self.objeto}.{self.atributo} = {self.valor})"

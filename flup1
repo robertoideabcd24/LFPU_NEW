@@ -8,10 +8,10 @@ from lexer import Lexer
 from parser import Parser, Asignacion, OperacionBinaria, Numero, Variable, Cadena, Prt, Bloque, If
 from interprete import Interpreter
 from colors import Colors
-from base import Asignacion, OperacionBinaria, Numero, Variable, Cadena, Prt, Bloque, If 
+from base import Asignacion, OperacionBinaria, Numero, Variable, Cadena, Prt, Bloque, If ,Booleano, Clase, CreacionInstancia, InstanciaClase
 from flup_logger import BasicFlupLogger
 
-# Configuración inicial
+# Configuración inicial para el modo bot
 logger = BasicFlupLogger()
 
 def escribir_como_humano(consola, texto, delay=0.03):
@@ -20,8 +20,8 @@ def escribir_como_humano(consola, texto, delay=0.03):
         sys.stdout.write(char)
         sys.stdout.flush()
         time.sleep(delay)
-    consola.sendline("")  # Simula Enter
-    print()  # Salto de línea en consola visual
+    consola.sendline("")  # Simula los Enter que da
+    print()  # hace el salto de linea en consola
 
 def imprimir_lento(texto, delay=0.01):
     for char in texto:
@@ -30,7 +30,6 @@ def imprimir_lento(texto, delay=0.01):
         time.sleep(delay)
     #print()
 
-# Función para imprimir el árbol de sintaxis
 def imprimir_arbol_sintaxis(nodes):
     if not nodes:  # Si no hay nodos
         print("(Árbol vacío)")
@@ -52,7 +51,16 @@ def _imprimir_nodo(node, prefijo, es_ultimo):
         print(f"Asignacion({node.nombre_var} = ...)")
         nuevo_prefijo = prefijo + ("    " if es_ultimo else "│   ")
         _imprimir_nodo(node.valor, nuevo_prefijo, True)
-    # En la función _imprimir_nodo:
+    elif isinstance(node, Clase):
+        print(f"Clase({node.nombre})")
+        nuevo_prefijo = prefijo + ("    " if es_ultimo else "│   ")
+        for i, atributo in enumerate(node.atributos):
+            print(nuevo_prefijo + ("└── " if i == len(node.atributos)-1 else "├── ") + f"Atributo({atributo})")
+    elif isinstance(node, CreacionInstancia):
+        print(f"Instancia({node.nombre_instancia} de {node.nombre_clase})")
+    elif isinstance(node, str):
+        print(f"Atributo({node})")
+
     elif isinstance(node, OperacionBinaria):
         print(f"OperacionBinaria({node.operador})")
         nuevo_prefijo = prefijo + ("    " if es_ultimo else "│   ")
@@ -76,7 +84,6 @@ def _imprimir_nodo(node, prefijo, es_ultimo):
             _imprimir_nodo(decl, nuevo_prefijo + "    ", i == len(node.cuerpo)-1)
     else:
         print(f"Tipo de nodo desconocido: {type(node)}")
-
 
 def modo_interactivo():
     """Modo consola interactiva mejorado"""
@@ -135,8 +142,9 @@ def modo_interactivo():
             print(f"{Colors.FAIL}Error inesperado: {str(e)}{Colors.RESET}")
             logger.log_error("", e)
 
+
 def aplicar_colores(texto):
-    """Aplica colores a los elementos del código"""
+    """Aplicar colores a los elementos del código"""
     # Tokenizar el texto para identificar elementos
     lexer = Lexer(texto)
     tokens = lexer.tokenizar()
@@ -166,6 +174,7 @@ def modo_script(archivo, debug=False):
         with open(archivo, 'r') as f:
             contenido = f.read()
 
+        #si debug = True, muestra el AST
         if debug:
             print(f"{Colors.TITULO}=== Modo AST (Debug) ==={Colors.RESET}")
             lexer = Lexer(contenido)
@@ -176,6 +185,8 @@ def modo_script(archivo, debug=False):
             imprimir_arbol_sintaxis(ast)
             print(f"{Colors.TITULO}====================={Colors.RESET}\n")
 
+        # si debug = False, solo ejecuta el script
+        # si debug = True, los mostradoen el script se muestra en medio
         interprete = Interpreter()
         lexer = Lexer(contenido)
         tokens = lexer.tokenizar()
@@ -183,6 +194,7 @@ def modo_script(archivo, debug=False):
         ast = parser.analizar()
         resultado = interprete.ejecutar(ast)
 
+        # si debud = True, muestra la memoria final
         if debug:
             print(f"\n{Colors.TITULO}=== Estado final de memoria ==={Colors.RESET}")
             for var, valor in interprete.memoria.items():
@@ -198,7 +210,7 @@ def ejecutar_como_bot(archivo):
         print(f"{Colors.FAIL}Error:{Colors.RESET} Archivo no encontrado")
         return
 
-    print(f"{Colors.TITULO}FLUP V1 (Abril 2025) - Intérprete Interactivo BOOT GRF-3X.{Colors.RESET}")
+    print(f"{Colors.TITULO}FLUP V1 (Abril 2025) - Intérprete Interactivo BOT GRF-3X.{Colors.RESET}")
     print(f"{Colors.TITULO}Data Byte Fortress (México).{Colors.RESET}")
 
     child = pexpect.spawn(f'{sys.executable} {__file__} v1', encoding='utf-8', timeout=10)
@@ -225,7 +237,7 @@ def ejecutar_como_bot(archivo):
                 # Enviar comando al intérprete
                 child.sendline(line)
                 
-                # Manejo especial para Prt
+                # Manejo especial para Prt para que se ven en el prompt
                 if line.startswith('Prt(') or line.startswith('Prt ('):
                     in_prt_output = True
                 
@@ -251,7 +263,7 @@ def ejecutar_como_bot(archivo):
                     try:
                         child.expect('flup>', timeout=1)
                         output = child.before.strip()
-                        # Solo mostrar output si es de un Prt o hay error
+                        # Solo mostrar el output si es de un Prt o hay error
                         if in_prt_output or 'Error' in output:
                             print(output)
                         in_prt_output = False
@@ -294,6 +306,8 @@ def main():
     except Exception as e:
         print(f"\n{Colors.FAIL}Error inesperado:{Colors.RESET} {str(e)}")
 
+# muestra las opciones disponibles para usar el interprete
+# ayuda a explicar los diferentes modos de uso
 def mostrar_ayuda():
     print("Uso:")
     print("  flup v1          - Modo interactivo")

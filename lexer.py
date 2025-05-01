@@ -1,12 +1,14 @@
 import re
 
 class Lexer:
-    def __init__(self, texto_entrada, debug=False):  # Asegúrate de incluir debug como parámetro
+
+    def __init__(self, texto_entrada, debug=False): 
         self.texto_entrada = texto_entrada
         self.tokens = []
         self.caracter_actual = None
         self.posicion = 0
-        self.debug = debug  # Nuevo parámetro para controlar la salida
+        # Nuevo parámetro para controlar la salida
+        self.debug = debug  
         self.avanzar()
 
     def error(self):
@@ -65,6 +67,8 @@ class Lexer:
             'if': 'IF',
             'eli': 'ELIF',
             'els': 'ELSE',
+            'class': 'CLASS',
+            'exit': 'EXIT'  ,
         }
         
         return (reservadas.get(resultado.lower(), 'ID'), resultado)
@@ -263,9 +267,10 @@ class Lexer:
         except Exception as e:
             raise SyntaxError(f"Error léxico: {str(e)}")
 
+    # contabiliza el número de líneas segun la posición y se detecte de una mejor forma los errores
     def get_line_number(self, pos):
         return self.texto_entrada.count('\n', 0, pos) + 1
-    
+ 
     def cadena(self):
         resultado = ''
         self.avanzar()  # Saltar la comilla inicial
@@ -307,7 +312,16 @@ class Lexer:
                 continue
                 
             tokens.append(token)
-            if self.debug:  # Solo mostrar tokens en modo debug
+             # Solo mostrar tokens en modo debug
+            if self.debug: 
                 print(f"Token reconocido: {token}")
             
         return tokens
+    
+
+    def _handle_indentation(self):
+        spaces = 0
+        while self.current_char == ' ':
+            spaces += 1
+            self.advance()
+        return ('INDENTACION', spaces) 
