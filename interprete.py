@@ -15,7 +15,15 @@ class Interpreter:
         
         for nodo in ast:
             try:
-                if isinstance(nodo, Clase):
+
+                if isinstance(nodo, Prt):
+                    # Evaluar la expresión y mostrar el resultado
+                    valor = self.evaluar_expresion(nodo.expresion)
+                    if not self.silent_mode:  # Solo imprimir si no estamos en modo silencioso
+                        print(valor)
+                    continue
+
+                elif isinstance(nodo, Clase):
                     self.clases[nodo.nombre] = nodo
                     if debug:
                         print(f"[DEBUG] Clase definida: {nodo.nombre}")
