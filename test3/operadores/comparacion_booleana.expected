@@ -1,4 +1,0 @@
-a < b: true
-a > b: false
-a = b: false
-a != b: true

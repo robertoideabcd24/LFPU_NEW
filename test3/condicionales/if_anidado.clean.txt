@@ -1,3 +1,0 @@
-
-✗ Error durante la ejecución:
-Se esperaba ')' después de condición if
