@@ -75,17 +75,16 @@ class BasicFlupLogger:
         )
     
     def _write_log(self, entry: Dict[str, Any]):
-        """Escribe el log manejando rotación de archivos"""
-        # Verificar tamaño del archivo actual
+        # No mostrar en terminal
         if os.path.exists(self.current_log_file):
             file_size = os.path.getsize(self.current_log_file)
             if file_size >= self.max_log_size:
                 self._rotate_log_file()
         
-        # Escribir en formato JSONL (una línea por entrada)
         with open(self.current_log_file, 'a', encoding='utf-8') as f:
             json.dump(entry, f, ensure_ascii=False)
             f.write('\n')
+
     
     def _rotate_log_file(self):
         """Rota el archivo de log cuando alcanza el tamaño máximo"""
@@ -98,7 +97,7 @@ class BasicFlupLogger:
         """Obtiene el archivo de log actual basado en la fecha"""
         return os.path.join(
             self.log_dir,
-            f"flup_{datetime.now().strftime('%Y%m%d')}.jsonl"
+            f"flup_{datetime.now().strftime('%Y%m%d')}.json"
         )
     
     def _generate_session_id(self) -> str:

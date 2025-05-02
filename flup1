@@ -60,7 +60,6 @@ def _imprimir_nodo(node, prefijo, es_ultimo):
         print(f"Instancia({node.nombre_instancia} de {node.nombre_clase})")
     elif isinstance(node, str):
         print(f"Atributo({node})")
-
     elif isinstance(node, OperacionBinaria):
         print(f"OperacionBinaria({node.operador})")
         nuevo_prefijo = prefijo + ("    " if es_ultimo else "│   ")
@@ -73,17 +72,39 @@ def _imprimir_nodo(node, prefijo, es_ultimo):
     elif isinstance(node, Cadena):
         print(f"Cadena('{node.valor}')")
     elif isinstance(node, Prt):
-        print(f"Prt(...)")
-        nuevo_prefijo = prefijo + ("    " if es_ultimo else "│   ")
-        _imprimir_nodo(node.expresion, nuevo_prefijo, True)
+        # Modificación para mostrar el mensaje completo del Prt
+        print("Prt(", end="")
+        if isinstance(node.expresion, Cadena):
+            print(f"'{node.expresion.valor}')")
+        else:
+            print("...)")
+            nuevo_prefijo = prefijo + ("    " if es_ultimo else "│   ")
+            _imprimir_nodo(node.expresion, nuevo_prefijo, True)
     elif isinstance(node, If):
         print(f"If(condición: {node.condicion})")
         nuevo_prefijo = prefijo + ("    " if es_ultimo else "│   ")
-        print(nuevo_prefijo + "└── Cuerpo:")
+        
+        # Cuerpo If
+        print(nuevo_prefijo + "└── Cuerpo If:")
         for i, decl in enumerate(node.cuerpo):
             _imprimir_nodo(decl, nuevo_prefijo + "    ", i == len(node.cuerpo)-1)
+        
+        # Bloques Elif
+        for j, (cond_elif, cuerpo_elif) in enumerate(node.elifs):
+            print(nuevo_prefijo + ("└── " if j == len(node.elifs)-1 and not node.else_cuerpo else "├── ") + f"Elif(condición: {cond_elif})")
+            print(nuevo_prefijo + ("    " if j == len(node.elifs)-1 and not node.else_cuerpo else "│   ") + "└── Cuerpo Elif:")
+            for k, decl in enumerate(cuerpo_elif):
+                _imprimir_nodo(decl, nuevo_prefijo + ("    " if j == len(node.elifs)-1 and not node.else_cuerpo else "│   ") + "    ", k == len(cuerpo_elif)-1)
+        
+        # Bloque Else
+        if node.else_cuerpo:
+            print(nuevo_prefijo + "└── Else:")
+            print(nuevo_prefijo + "    └── Cuerpo Else:")
+            for l, decl in enumerate(node.else_cuerpo):
+                _imprimir_nodo(decl, nuevo_prefijo + "        ", l == len(node.else_cuerpo)-1)
     else:
         print(f"Tipo de nodo desconocido: {type(node)}")
+
 
 def modo_interactivo():
     """Modo consola interactiva mejorado"""
@@ -122,13 +143,12 @@ def modo_interactivo():
                 if resultado is not None:
                     print(str(resultado))
                     
+                # Registrar ejecución exitosa
                 logger.log_execution(
                     source_code=entrada,
-                    output=str(resultado) if resultado is not None else None,
-                    metadata={
-                        "interactive": True,
-                        "memory": interprete.memoria.copy()
-                    }
+                    output=str(resultado),
+                    metadata={"modo": "interactivo"},
+                    command_type="user_input"
                 )
                 
             except Exception as e:
@@ -194,6 +214,13 @@ def modo_script(archivo, debug=False):
         ast = parser.analizar()
         resultado = interprete.ejecutar(ast)
 
+        logger.log_execution(
+            source_code=contenido,
+            output=str(resultado),
+            metadata={"modo": "archivo"},
+            command_type="script_run"
+        )
+
         # si debud = True, muestra la memoria final
         if debug:
             print(f"\n{Colors.TITULO}=== Estado final de memoria ==={Colors.RESET}")
@@ -202,6 +229,7 @@ def modo_script(archivo, debug=False):
             print(f"{Colors.TITULO}=============================={Colors.RESET}")
 
     except Exception as e:
+        logger.log_error(source_code=contenido, exception=e)
         print(f"{Colors.FAIL}Error en script: {str(e)}{Colors.RESET}")
 
 def ejecutar_como_bot(archivo):

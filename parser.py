@@ -5,11 +5,11 @@ class Parser:
     def __init__(self, tokens):
         self.tokens = tokens
         self.posicion = 0
+        self.debug = False
 
     def analizar(self):
         declaraciones = []
         
-        # Fase 1: Procesar solo declaraciones de clase primero
         while self.posicion < len(self.tokens):
             token_actual = self.tokens[self.posicion]
             
@@ -18,46 +18,26 @@ class Parser:
                 self.posicion += 1
                 continue
                 
-            if token_actual[0] == 'CLASS':
-                declaracion = self.declaracion_clase()
-                declaraciones.append(declaracion)
-            else:
-                # Si no es una clase, salimos del bucle de clases
-                break
-        
-        # Fase 2: Procesar el resto de declaraciones (asignaciones, etc.)
-        while self.posicion < len(self.tokens):
-            token_actual = self.tokens[self.posicion]
-            
-            # Saltar tokens de formato
-            if token_actual[0] in ('NUEVA_LINEA', 'ESPACIO', 'TAB', 'PUNTO_COMA'):
-                self.posicion += 1
-                continue
-                
-            # Procesar diferentes tipos de declaraciones
-            if token_actual[0] == 'ID':
-                # Verificar si es una asignación (:=)
-                if (self.posicion + 1 < len(self.tokens) and 
-                    self.tokens[self.posicion + 1][0] == 'ASIGNACION'):
-                    declaracion = self.declaracion_asignacion()
-                    declaraciones.append(declaracion)
-                else:
-                    # Variable declarada sin asignación
-                    nombre_var = token_actual[1]
-                    self.posicion += 1
-                    declaraciones.append(Asignacion(nombre_var, None))
-                    # Consumir punto y coma si existe
-                    if self.posicion < len(self.tokens) and self.tokens[self.posicion][0] == 'PUNTO_COMA':
+            # Manejar declaraciones de nivel superior (sin indentación)
+            if token_actual[0] != 'INDENTACION':
+                if token_actual[0] == 'ID':
+                    if self.posicion+1 < len(self.tokens) and self.tokens[self.posicion+1][0] == 'ASIGNACION':
+                        declaraciones.append(self.declaracion_asignacion())
+                    else:
                         self.posicion += 1
-            elif token_actual[0] == 'PRT':
-                declaracion = self.declaracion_prt()
-                declaraciones.append(declaracion)
-            elif token_actual[0] == 'IF':
-                declaracion = self.declaracion_if()
-                declaraciones.append(declaracion)
+                elif token_actual[0] == 'PRT':
+                    # Solo procesar PRT no indentado
+                    if self.posicion == 0 or self.tokens[self.posicion-1][0] != 'INDENTACION':
+                        declaraciones.append(self.declaracion_prt())
+                    else:
+                        self.posicion += 1
+                elif token_actual[0] == 'IF':
+                    declaraciones.append(self.declaracion_if())
+                else:
+                    self.posicion += 1
             else:
-                # Token no reconocido, avanzar
-                self.posicion += 1
+                # Indentación inesperada a nivel raíz
+                raise SyntaxError(f"Indentación inesperada en posición {self.posicion}")
         
         return declaraciones
 
@@ -329,67 +309,189 @@ class Parser:
         return nodo
 
     def declaracion_if(self):
-        if self.posicion >= len(self.tokens) or self.tokens[self.posicion][0] != 'IF':
-            return None
-        # empieza a onsumir 'If'
-        self.posicion += 1  
+        if self.debug:
+            print(f"[DEBUG IF] Iniciando If en posición {self.posicion}")
+
+        # Consumir 'If'
+        self.posicion += 1
         
-        # Verificar paréntesis de apertura
+        # Procesar condición
         if self.tokens[self.posicion][0] != 'PAREN_IZQ':
             raise SyntaxError("Se esperaba '(' después de 'If'")
         self.posicion += 1
         
         condicion = self.expresion_or()
         
-        # Verificar paréntesis de cierre
         if self.tokens[self.posicion][0] != 'PAREN_DER':
             raise SyntaxError("Se esperaba ')' después de condición If")
         self.posicion += 1
         
-        # Verificar dos puntos
         if self.tokens[self.posicion][0] != 'DOS_PUNTOS':
             raise SyntaxError("Se esperaba ':' después de condición If")
         self.posicion += 1
         
-        # Saltar espacios y nuevas líneas
-        while self.posicion < len(self.tokens) and self.tokens[self.posicion][0] in ('NUEVA_LINEA', 'ESPACIO'):
-            self.posicion += 1
-
-        # Verificar indentación
+        # Procesar indentación del if
         if self.posicion >= len(self.tokens) or self.tokens[self.posicion][0] != 'INDENTACION':
-            raise SyntaxError("Se esperaba indentación después del If")
+            raise SyntaxError("Se esperaba indentación después del if")
         
-        nivel_indentacion = self.tokens[self.posicion][1]
+        nivel_if = int(self.tokens[self.posicion][1])
         self.posicion += 1
         
-        # Procesar cuerpo del if
+        # Procesar cuerpo del if (solo declaraciones con mayor indentación)
         cuerpo = []
         while self.posicion < len(self.tokens):
-            # Fin del bloque cuando la indentación disminuye
+            # Verificar fin de bloque
             if self.tokens[self.posicion][0] == 'INDENTACION':
-                if self.tokens[self.posicion][1] < nivel_indentacion:
+                current_indent = int(self.tokens[self.posicion][1])
+                if current_indent < nivel_if:
                     break
-                if self.tokens[self.posicion][1] > nivel_indentacion:
-                    raise SyntaxError("Indentación inconsistente")
+                if current_indent > nivel_if:
+                    raise SyntaxError("Indentación inconsistente en bloque if")
                 self.posicion += 1
-            # Fin del bloque si encontramos una línea no indentada
-            if self.tokens[self.posicion][0] == 'NUEVA_LINEA':
-                self.posicion += 1
-                # Verificar si la siguiente línea está menos indentada
-                if self.posicion < len(self.tokens) and self.tokens[self.posicion][0] not in ('ESPACIO', 'TAB'):
-                    break
-                continue
             
-            # Procesar declaración PRT
-            if self.tokens[self.posicion][0] == 'PRT':
-                prt_decl = self.declaracion_prt()
-                if prt_decl:
-                    cuerpo.append(prt_decl)
+            # Procesar declaraciones dentro del if
+            token_actual = self.tokens[self.posicion]
+            
+            if token_actual[0] == 'PRT':
+                cuerpo.append(self.declaracion_prt())
+            elif token_actual[0] == 'IF':
+                cuerpo.append(self.declaracion_if())
+            elif token_actual[0] == 'ID' and self.posicion+1 < len(self.tokens) and self.tokens[self.posicion+1][0] == 'ASIGNACION':
+                cuerpo.append(self.declaracion_asignacion())
             else:
                 break
         
-        return If(condicion, cuerpo)
+        # Procesar ELIFs
+        elifs = []
+        while self.posicion < len(self.tokens) and self.tokens[self.posicion][0] == 'ELIF':
+            self.posicion += 1  # Consumir 'ELIF'
+            
+            # Procesar condición ELIF
+            if self.tokens[self.posicion][0] != 'PAREN_IZQ':
+                raise SyntaxError("Se esperaba '(' después de 'elif'")
+            self.posicion += 1
+            
+            cond_elif = self.expresion_or()
+            
+            if self.tokens[self.posicion][0] != 'PAREN_DER':
+                raise SyntaxError("Se esperaba ')' después de condición elif")
+            self.posicion += 1
+            
+            if self.tokens[self.posicion][0] != 'DOS_PUNTOS':
+                raise SyntaxError("Se esperaba ':' después de condición elif")
+            self.posicion += 1
+            
+            # Procesar indentación ELIF
+            if self.posicion >= len(self.tokens) or self.tokens[self.posicion][0] != 'INDENTACION':
+                raise SyntaxError("Se esperaba indentación después de elif")
+            
+            nivel_elif = int(self.tokens[self.posicion][1])
+            self.posicion += 1
+            
+            # Procesar cuerpo ELIF
+            cuerpo_elif = []
+            while self.posicion < len(self.tokens):
+                if self.tokens[self.posicion][0] == 'INDENTACION':
+                    current_indent = int(self.tokens[self.posicion][1])
+                    if current_indent < nivel_elif:
+                        break
+                    if current_indent > nivel_elif:
+                        raise SyntaxError("Indentación inconsistente en elif")
+                    self.posicion += 1
+                
+                token_actual = self.tokens[self.posicion]
+                
+                if token_actual[0] == 'PRT':
+                    cuerpo_elif.append(self.declaracion_prt())
+                elif token_actual[0] == 'IF':
+                    cuerpo_elif.append(self.declaracion_if())
+                elif token_actual[0] == 'ID' and self.posicion+1 < len(self.tokens) and self.tokens[self.posicion+1][0] == 'ASIGNACION':
+                    cuerpo_elif.append(self.declaracion_asignacion())
+                else:
+                    break
+            
+            elifs.append((cond_elif, cuerpo_elif))
+        
+        # Procesar ELSE
+        else_cuerpo = None
+        if self.posicion < len(self.tokens) and self.tokens[self.posicion][0] == 'ELSE':
+            self.posicion += 1  # Consumir 'ELSE'
+            
+            if self.tokens[self.posicion][0] != 'DOS_PUNTOS':
+                raise SyntaxError("Se esperaba ':' después de 'else'")
+            self.posicion += 1
+            
+            # Procesar indentación ELSE
+            if self.posicion >= len(self.tokens) or self.tokens[self.posicion][0] != 'INDENTACION':
+                raise SyntaxError("Se esperaba indentación después de else")
+            
+            nivel_else = int(self.tokens[self.posicion][1])
+            self.posicion += 1
+            
+            # Procesar cuerpo ELSE
+            else_cuerpo = []
+            while self.posicion < len(self.tokens):
+                if self.tokens[self.posicion][0] == 'INDENTACION':
+                    current_indent = int(self.tokens[self.posicion][1])
+                    if current_indent < nivel_else:
+                        break
+                    if current_indent > nivel_else:
+                        raise SyntaxError("Indentación inconsistente en else")
+                    self.posicion += 1
+                
+                token_actual = self.tokens[self.posicion]
+                
+                if token_actual[0] == 'PRT':
+                    else_cuerpo.append(self.declaracion_prt())
+                elif token_actual[0] == 'IF':
+                    else_cuerpo.append(self.declaracion_if())
+                elif token_actual[0] == 'ID' and self.posicion+1 < len(self.tokens) and self.tokens[self.posicion+1][0] == 'ASIGNACION':
+                    else_cuerpo.append(self.declaracion_asignacion())
+                else:
+                    break
+        
+        return If(condicion, cuerpo, elifs, else_cuerpo)
+    
+    def _procesar_bloque_indentado(self):
+        declaraciones = []
+        
+        # Verificar si hay indentación
+        if self.posicion >= len(self.tokens) or self.tokens[self.posicion][0] != 'INDENTACION':
+            return declaraciones
+        
+        nivel_indent = int(self.tokens[self.posicion][1])
+        self.posicion += 1  # Consumir indentación
+        
+        while self.posicion < len(self.tokens):
+            # Verificar fin de bloque
+            if self.tokens[self.posicion][0] == 'INDENTACION':
+                if int(self.tokens[self.posicion][1]) < nivel_indent:
+                    break
+                self.posicion += 1
+            
+            # Procesar declaraciones
+            token_actual = self.tokens[self.posicion]
+            
+            if token_actual[0] == 'PRT':
+                declaraciones.append(self.declaracion_prt())
+            elif token_actual[0] == 'IF':
+                declaraciones.append(self.declaracion_if())
+            elif token_actual[0] == 'ID' and self.posicion+1 < len(self.tokens) and self.tokens[self.posicion+1][0] == 'ASIGNACION':
+                declaraciones.append(self.declaracion_asignacion())
+            else:
+                break
+        
+        return declaraciones
 
+    def _verificar_tipo_siguiente(self, tipo):
+        """Verifica si el siguiente token es del tipo especificado"""
+        return (self.posicion + 1 < len(self.tokens)) and \
+            (self.tokens[self.posicion + 1][0] == tipo)
+
+    def _es_parte_de_bloque(self):
+        """Determina si el token actual es parte de un bloque (If, Eli, Els)"""
+        return self.tokens[self.posicion][0] in ('IF', 'ELIF', 'ELSE', 'PRT')
+    
     
     def declaracion_clase(self):
         self._consumir('CLASS', "Se esperaba 'Class'")

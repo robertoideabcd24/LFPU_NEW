@@ -14,6 +14,10 @@ class Interpreter:
         self.debug = debug
         self.memoria = {}
         self.clases = {}
+
+        # Asegurarse de que ast sea una lista, incluso si es un solo nodo
+        if not isinstance(ast, (list, tuple)):
+            ast = [ast]
         
         for nodo in ast:
             try:
@@ -77,6 +81,45 @@ class Interpreter:
                     
                     if debug:
                         print(f"[DEBUG] Asignado {nodo.objeto}.{nodo.atributo} = {valor}")
+
+
+                elif isinstance(nodo, If):
+                    if self.debug:
+                        print(f"[DEBUG EJECUCION] Ejecutando If con condición: {nodo.condicion}")
+                        print(f"[DEBUG EJECUCION] Cuerpo If: {nodo.cuerpo}")
+                        print(f"[DEBUG EJECUCION] Elifs: {nodo.elifs}")
+                        print(f"[DEBUG EJECUCION] Else: {nodo.else_cuerpo}")
+                    
+                    condicion = self.evaluar_expresion(nodo.condicion)
+                    
+                    if self.debug:
+                        print(f"[DEBUG EJECUCION] Resultado condición: {condicion}")
+                    
+                    if condicion:
+                        if self.debug:
+                            print("[DEBUG EJECUCION] Ejecutando cuerpo If")
+                        for stmt in nodo.cuerpo:
+                            self.ejecutar(stmt, debug)
+                    else:
+                        # Procesar Elifs
+                        ejecutado = False
+                        for cond, cuerpo in nodo.elifs:
+                            if self.debug:
+                                print(f"[DEBUG EJECUCION] Evaluando Elif con condición: {cond}")
+                            if self.evaluar_expresion(cond):
+                                if self.debug:
+                                    print("[DEBUG EJECUCION] Ejecutando cuerpo Elif")
+                                ejecutado = True
+                                for stmt in cuerpo:
+                                    self.ejecutar(stmt, debug)
+                                break
+                        
+                        # Procesar Else si no se ejecutó If ni Elifs
+                        if not ejecutado and nodo.else_cuerpo:
+                            if self.debug:
+                                print("[DEBUG EJECUCION] Ejecutando cuerpo Else")
+                            for stmt in nodo.else_cuerpo:
+                                self.ejecutar(stmt, debug)
 
                 elif isinstance(nodo, Asignacion):
                     valor = self.evaluar_expresion(nodo.valor)
@@ -226,22 +269,33 @@ class Interpreter:
 
     def evaluar_if(self, nodo_if, debug=False):
         if debug:
-            print(f"\n[DEBUG] Evaluando condición If: {nodo_if.condicion}")
+            print(f"\n[DEBUG] Evaluando If como expresión: {nodo_if.condicion}")
         
+        # Evaluar condición principal
         condicion = self.evaluar_expresion(nodo_if.condicion, debug)
-        
-        if debug:
-            print(f"[DEBUG] Resultado condición: {condicion}")
-            print(f"[DEBUG] Cuerpo If contiene {len(nodo_if.cuerpo)} declaraciones")
         
         if condicion:
             if debug:
-                print(f"[DEBUG] Ejecutando bloque If con {len(nodo_if.cuerpo)} declaraciones")
-            for declaracion in nodo_if.cuerpo:
-                self.ejecutar([declaracion], debug)
+                print("[DEBUG] Retornando resultado del cuerpo If")
+            for stmt in nodo_if.cuerpo:
+                return self.evaluar_expresion(stmt, debug)
+        else:
+            # Procesar Elifs
+            for cond, cuerpo in nodo_if.elifs:
+                if self.evaluar_expresion(cond, debug):
+                    if debug:
+                        print("[DEBUG] Retornando resultado del cuerpo Elif")
+                    for stmt in cuerpo:
+                        return self.evaluar_expresion(stmt, debug)
+            # Procesar Else si no se ejecutó If ni Elifs
+            if nodo_if.else_cuerpo:
+                if debug:
+                    print("[DEBUG] Retornando resultado del cuerpo Else")
+                for stmt in nodo_if.else_cuerpo:
+                    return self.evaluar_expresion(stmt, debug)
         
-        return None
-            
+        return None  # Si no se ejecuta ningún bloque
+
 
     def evaluar_bloque(self, bloque, debug=False):
         resultado = None
