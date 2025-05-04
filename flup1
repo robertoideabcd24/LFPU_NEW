@@ -3,12 +3,12 @@ import sys
 import os
 import readline  
 import time
-import pexpect
+import pexpect # type: ignore
 from lexer import Lexer
 from parser import Parser, Asignacion, OperacionBinaria, Numero, Variable, Cadena, Prt, Bloque, If
 from interprete import Interpreter
 from colors import Colors
-from base import Asignacion, OperacionBinaria, Numero, Variable, Cadena, Prt, Bloque, If ,Booleano, Clase, CreacionInstancia, InstanciaClase
+from base import Asignacion, OperacionBinaria, Numero, Variable, Cadena, Prt, Bloque, If ,Booleano, Clase, CreacionInstancia, InstanciaClase, Fac, Sqrt, Pow, Inp
 from flup_logger import BasicFlupLogger
 
 # Configuración inicial para el modo bot
@@ -48,38 +48,69 @@ def _imprimir_nodo(node, prefijo, es_ultimo):
     print(prefijo + marcador, end="")
     
     if isinstance(node, Asignacion):
-        print(f"Asignacion({node.nombre_var} = ...)")
+        print(f"Asignacion({node.nombre_var})")
         nuevo_prefijo = prefijo + ("    " if es_ultimo else "│   ")
         _imprimir_nodo(node.valor, nuevo_prefijo, True)
+
+    elif isinstance(node, Fac):
+        print(f"Fac(", end="")
+        if isinstance(node.expresion, (Numero, Variable, Cadena)):
+            # Mostrar directamente si es simple
+            print(f"{node.expresion})")
+        else:
+            print("...)")
+            nuevo_prefijo = prefijo + ("    " if es_ultimo else "│   ")
+            _imprimir_nodo(node.expresion, nuevo_prefijo, True)
+
+    elif isinstance(node, Sqrt):
+        print(f"Sqrt(", end="")
+        if isinstance(node.expresion, (Numero, Variable, Cadena)):
+            print(f"{node.expresion})")
+        else:
+            print("...)")
+            nuevo_prefijo = prefijo + ("    " if es_ultimo else "│   ")
+            _imprimir_nodo(node.expresion, nuevo_prefijo, True)
+
+    elif isinstance(node, Pow):
+        print(f"Pow(base, exponente)")
+        nuevo_prefijo = prefijo + ("    " if es_ultimo else "│   ")
+        print(nuevo_prefijo + "├── Base:")
+        _imprimir_nodo(node.base, nuevo_prefijo + "│   ", False)
+        print(nuevo_prefijo + "└── Exponente:")
+        _imprimir_nodo(node.exponente, nuevo_prefijo + "    ", True)
+
     elif isinstance(node, Clase):
         print(f"Clase({node.nombre})")
         nuevo_prefijo = prefijo + ("    " if es_ultimo else "│   ")
         for i, atributo in enumerate(node.atributos):
             print(nuevo_prefijo + ("└── " if i == len(node.atributos)-1 else "├── ") + f"Atributo({atributo})")
+
     elif isinstance(node, CreacionInstancia):
         print(f"Instancia({node.nombre_instancia} de {node.nombre_clase})")
+
     elif isinstance(node, str):
         print(f"Atributo({node})")
+
     elif isinstance(node, OperacionBinaria):
         print(f"OperacionBinaria({node.operador})")
         nuevo_prefijo = prefijo + ("    " if es_ultimo else "│   ")
         _imprimir_nodo(node.izquierda, nuevo_prefijo, False)
         _imprimir_nodo(node.derecha, nuevo_prefijo, True)
+
     elif isinstance(node, Numero):
         print(f"Numero({node.valor})")
+
     elif isinstance(node, Variable):
         print(f"Variable({node.nombre})")
+
     elif isinstance(node, Cadena):
         print(f"Cadena('{node.valor}')")
+
     elif isinstance(node, Prt):
-        # Modificación para mostrar el mensaje completo del Prt
-        print("Prt(", end="")
-        if isinstance(node.expresion, Cadena):
-            print(f"'{node.expresion.valor}')")
-        else:
-            print("...)")
-            nuevo_prefijo = prefijo + ("    " if es_ultimo else "│   ")
-            _imprimir_nodo(node.expresion, nuevo_prefijo, True)
+        print("Prt(...)")
+        nuevo_prefijo = prefijo + ("    " if es_ultimo else "│   ")
+        _imprimir_nodo(node.expresion, nuevo_prefijo, True)
+
     elif isinstance(node, If):
         print(f"If(condición: {node.condicion})")
         nuevo_prefijo = prefijo + ("    " if es_ultimo else "│   ")
@@ -102,6 +133,18 @@ def _imprimir_nodo(node, prefijo, es_ultimo):
             print(nuevo_prefijo + "    └── Cuerpo Else:")
             for l, decl in enumerate(node.else_cuerpo):
                 _imprimir_nodo(decl, nuevo_prefijo + "        ", l == len(node.else_cuerpo)-1)
+
+    elif isinstance(node, Inp):
+        if hasattr(node, 'mensaje') and node.mensaje:
+            if isinstance(node.mensaje, Cadena):
+                print(f"Inp(mensaje='{node.mensaje.valor}')")
+            else:
+                print(f"Inp(mensaje=...)")
+                nuevo_prefijo = prefijo + ("    " if es_ultimo else "│   ")
+                _imprimir_nodo(node.mensaje, nuevo_prefijo, True)
+        else:
+            print("Inp()")
+
     else:
         print(f"Tipo de nodo desconocido: {type(node)}")
 

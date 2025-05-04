@@ -52,12 +52,26 @@ class Lexer:
             return ('FLOTANTE', float(resultado))
         else:
             return ('ENTERO', int(resultado))
+        
+    def _ignorar_comentario(self):
+        """Ignora los comentarios (todo desde # hasta el fin de línea)"""
+        while self.caracter_actual is not None and self.caracter_actual != '\n':
+            self.avanzar()
+        # Consumir el salto de línea también
+        if self.caracter_actual == '\n':
+            self.avanzar()
 
     def identificador(self):
         resultado = ''
         while self.caracter_actual is not None and (self.caracter_actual.isalnum() or self.caracter_actual == '_'):
             resultado += self.caracter_actual
             self.avanzar()
+
+        # Manejar booleanos primero
+        if resultado.lower() == 'true':
+            return ('BOOLEANO', True)
+        if resultado.lower() == 'false':
+            return ('BOOLEANO', False)
 
         reservadas = {
             'prt': 'PRT',
@@ -69,6 +83,10 @@ class Lexer:
             'els': 'ELSE',
             'class': 'CLASS',
             'exit': 'EXIT'  ,
+            'fac': 'FAC',
+            'sqrt': 'SQRT',
+            'pow': 'POW',
+            'inp': 'INP', 
         }
         
         return (reservadas.get(resultado.lower(), 'ID'), resultado)
@@ -76,6 +94,11 @@ class Lexer:
     def obtener_siguiente_token(self):
         try:
             while self.caracter_actual is not None:
+                
+                if self.caracter_actual == '#':
+                    self._ignorar_comentario()
+                    continue
+
                 # Manejar espacios en blanco
                 if self.caracter_actual in (' ', '\t'):
                     self.avanzar()
@@ -103,7 +126,6 @@ class Lexer:
                     num_token = self.numero()
                     return ('ENTERO', -num_token[1])  # Devuelve el número como negativo
 
-
                 if self.caracter_actual == '*':
                     self.avanzar()
                     return ('MULT', '*')
@@ -112,22 +134,32 @@ class Lexer:
                     self.avanzar()
                     return ('DIV', '/')
 
-                # Manejar dos puntos
+                # Manejar := con posibles espacios entre : y =
                 if self.caracter_actual == ':':
                     start_pos = self.posicion
                     self.avanzar()
+                    
+                    # Saltar espacios entre : y =
+                    while self.caracter_actual is not None and self.caracter_actual.isspace():
+                        self.avanzar()
+                        
                     if self.caracter_actual == '=':
                         self.avanzar()
                         return ('ASIGNACION', ':=')
                     else:
-                        # Retroceder para manejar solo ':' 
+                        # Retroceder para manejar solo :
                         self.posicion = start_pos
+                        self.caracter_actual = ':'
                         self.avanzar()
                         return ('DOS_PUNTOS', ':')
 
                 if self.caracter_actual == ';':
                     self.avanzar()
                     return ('PUNTO_COMA', ';')
+                
+                if self.caracter_actual == ',':
+                    self.avanzar()
+                    return ('COMA', ',') 
                 
                 if self.caracter_actual == '<':
                     self.avanzar()
@@ -273,11 +305,11 @@ class Lexer:
  
     def cadena(self):
         resultado = ''
+        inicio_pos = self.posicion - 1
         self.avanzar()  # Saltar la comilla inicial
         
         while self.caracter_actual is not None and self.caracter_actual != '"':
-            # Manejar caracteres escapados
-            if self.caracter_actual == '\\':
+            if self.caracter_actual == '\\':  # Manejar caracteres escapados
                 self.avanzar()
                 if self.caracter_actual == 'n':
                     resultado += '\n'
@@ -291,7 +323,8 @@ class Lexer:
                 self.avanzar()
         
         if self.caracter_actual != '"':
-            raise SyntaxError("Cadena sin cerrar")
+            linea_error = self.get_line_number(inicio_pos)
+            raise SyntaxError(f'Cadena sin cerrar en la línea {linea_error}')
         
         self.avanzar()  # Saltar la comilla final
         return ('CADENA', resultado)

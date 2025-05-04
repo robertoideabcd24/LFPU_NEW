@@ -8,17 +8,17 @@ demostracion/
 flup_analysis/
 __pycache__/
 
-# Ignorar archivos con extensión .flup
+# Ignorar archivos con extensión
 *.flup
 *.txt
 *.expected
-
 # Ignorar scripts de shell
 *.sh
 
 # Ignorar carpetas __pycache__
 **/__pycache__/
-
+.__pycache__
+.__pycache__/
 # Ignorar archivos y carpetas que comiencen con .venn
 .venn*__pycache__/
 .venv/

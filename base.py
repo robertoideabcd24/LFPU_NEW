@@ -61,21 +61,24 @@ class OperacionUnaria:
         return f"OperacionUnaria({self.operador} {self.expresion})"
     
 class If:
-    def __init__(self, condicion, cuerpo=None, elifs=None, else_cuerpo=None):
+    def __init__(self, condicion, cuerpo, elifs=None, else_cuerpo=None):
         self.condicion = condicion
-        self.cuerpo = cuerpo or []
+        self.cuerpo = cuerpo
         self.elifs = elifs or []
         self.else_cuerpo = else_cuerpo or []
-        
+
     def __repr__(self):
         parts = [f"If({self.condicion}):"]
         parts.extend(f"  {stmt}" for stmt in self.cuerpo)
+        
         for cond, cuerpo in self.elifs:
             parts.append(f"Elif({cond}):")
             parts.extend(f"  {stmt}" for stmt in cuerpo)
+            
         if self.else_cuerpo:
             parts.append("Else:")
             parts.extend(f"  {stmt}" for stmt in self.else_cuerpo)
+            
         return "\n".join(parts)
 
 class Bloque:
@@ -147,4 +150,35 @@ class AsignacionAtributo:
         self.valor = valor
     
     def __repr__(self):
-        return f"AsignacionAtributo({self.objeto}.{self.atributo} = {self.valor})"
+        return f"AsignacionAtributo({self.nombre_instancia}.{self.nombre_atributo} = {self.valor})"
+    
+class Fac:
+    def __init__(self, expresion):
+        self.expresion = expresion
+    
+    def __repr__(self):
+        return f"Fac({self.expresion})"
+    
+class Sqrt:
+    def __init__(self, expresion):
+        self.expresion = expresion
+    
+    def __repr__(self):
+        return f"Sqrt({self.expresion})"
+    
+class Pow:
+    def __init__(self, base, exponente):
+        self.base = base
+        self.exponente = exponente
+    
+    def __repr__(self):
+        return f"Pow({self.base}, {self.exponente})"
+    
+class Inp:
+    def __init__(self, mensaje=None):
+        self.mensaje = mensaje  
+    
+    def __repr__(self):
+        if self.mensaje:
+            return f"Inp({self.mensaje})"
+        return "Inp()"

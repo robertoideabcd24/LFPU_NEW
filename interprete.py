@@ -1,6 +1,8 @@
-from base import Numero, Variable, OperacionBinaria, Asignacion, Prt, Cadena, OperacionUnaria, If, Bloque, Booleano, Clase, CreacionInstancia, InstanciaClase, ExitCommand, AsignacionAtributo
+import os
+from base import Numero, Variable, OperacionBinaria, Asignacion, Prt, Cadena, OperacionUnaria, If, Bloque, Booleano, Clase, CreacionInstancia, InstanciaClase, ExitCommand, AsignacionAtributo, Fac, Sqrt, Pow, Inp
 from flup_logger import BasicFlupLogger, json
 from colors import Colors
+import math
 
 class Interpreter:
     def __init__(self):
@@ -9,6 +11,7 @@ class Interpreter:
         self.silent_mode = False
         self.running = True 
         self.logger = BasicFlupLogger() 
+        self.ambitos = [{}]
 
     def ejecutar(self, ast, debug=False):
         self.debug = debug
@@ -21,7 +24,6 @@ class Interpreter:
         
         for nodo in ast:
             try:
-
                 if isinstance(nodo, Prt):
                     valor = self.evaluar_expresion(nodo.expresion)
                     if not self.silent_mode:
@@ -35,7 +37,11 @@ class Interpreter:
                             "memory_snapshot": self.memoria.copy()
                         }
                     )
-                    continue
+
+                if isinstance(nodo, Fac):
+                    valor = self.evaluar_expresion(nodo.expresion)
+                    resultado = self.calcular_factorial(valor)
+                    print(resultado) 
 
                 elif isinstance(nodo, Clase):
                     self.clases[nodo.nombre] = nodo
@@ -82,49 +88,47 @@ class Interpreter:
                     if debug:
                         print(f"[DEBUG] Asignado {nodo.objeto}.{nodo.atributo} = {valor}")
 
-
                 elif isinstance(nodo, If):
-                    if self.debug:
-                        print(f"[DEBUG EJECUCION] Ejecutando If con condición: {nodo.condicion}")
-                        print(f"[DEBUG EJECUCION] Cuerpo If: {nodo.cuerpo}")
-                        print(f"[DEBUG EJECUCION] Elifs: {nodo.elifs}")
-                        print(f"[DEBUG EJECUCION] Else: {nodo.else_cuerpo}")
+                    if debug:
+                        print(f"[DEBUG] Evaluando If con condición: {nodo.condicion}")
                     
-                    condicion = self.evaluar_expresion(nodo.condicion)
-                    
-                    if self.debug:
-                        print(f"[DEBUG EJECUCION] Resultado condición: {condicion}")
-                    
-                    if condicion:
-                        if self.debug:
-                            print("[DEBUG EJECUCION] Ejecutando cuerpo If")
-                        for stmt in nodo.cuerpo:
-                            self.ejecutar(stmt, debug)
-                    else:
-                        # Procesar Elifs
-                        ejecutado = False
-                        for cond, cuerpo in nodo.elifs:
-                            if self.debug:
-                                print(f"[DEBUG EJECUCION] Evaluando Elif con condición: {cond}")
-                            if self.evaluar_expresion(cond):
-                                if self.debug:
-                                    print("[DEBUG EJECUCION] Ejecutando cuerpo Elif")
-                                ejecutado = True
-                                for stmt in cuerpo:
-                                    self.ejecutar(stmt, debug)
-                                break
+                    # Guardar estado de memoria antes del bloque condicional
+                    memoria_anterior = self.memoria.copy()
+                    try:
+                        # Evaluar condición principal
+                        condicion = self.evaluar_expresion(nodo.condicion, debug)
                         
-                        # Procesar Else si no se ejecutó If ni Elifs
-                        if not ejecutado and nodo.else_cuerpo:
-                            if self.debug:
-                                print("[DEBUG EJECUCION] Ejecutando cuerpo Else")
-                            for stmt in nodo.else_cuerpo:
-                                self.ejecutar(stmt, debug)
+                        if condicion:
+                            if debug:
+                                print("[DEBUG] Ejecutando cuerpo If")
+                            for stmt in nodo.cuerpo:
+                                self.ejecutar([stmt], debug)
+                        else:
+                            # Procesar ELIFs
+                            ejecutado = False
+                            for cond, cuerpo in nodo.elifs:
+                                if self.evaluar_expresion(cond, debug):
+                                    ejecutado = True
+                                    if debug:
+                                        print("[DEBUG] Ejecutando cuerpo Elif")
+                                    for stmt in cuerpo:
+                                        self.ejecutar([stmt], debug)
+                                    break
+                            
+                            # Procesar ELSE si no se ejecutó If ni Elifs
+                            if not ejecutado and nodo.else_cuerpo:
+                                if debug:
+                                    print("[DEBUG] Ejecutando cuerpo Else")
+                                for stmt in nodo.else_cuerpo:
+                                    self.ejecutar([stmt], debug)
+                    except Exception as e:
+                        # Restaurar memoria en caso de error
+                        self.memoria = memoria_anterior
+                        raise
 
                 elif isinstance(nodo, Asignacion):
-                    valor = self.evaluar_expresion(nodo.valor)
+                    valor = self.evaluar_expresion(nodo.valor, debug)
                     self.memoria[nodo.nombre_var] = valor
-                    
                     if debug:
                         print(f"[DEBUG] Asignado {nodo.nombre_var} = {valor}")
 
@@ -139,6 +143,17 @@ class Interpreter:
                 print(f"{k}: {v}")
             print("====================")
     
+
+
+    def entrar_ambito(self):
+        """Crea un nuevo ámbito heredando las variables del anterior"""
+        self.ambitos.append(self.memoria.copy())
+
+    def salir_ambito(self):
+        """Restaura el ámbito anterior"""
+        if len(self.ambitos) > 1:
+            self.ambitos.pop()
+        self.memoria = self.ambitos[-1]
 
     def ejecutar_asignacion(self, asignacion):
         # Maneja tanto números directos como operaciones binarias
@@ -184,7 +199,34 @@ class Interpreter:
         if debug:
             print(f"Evaluando expresión: {expr}")
 
+        if isinstance(expr, Fac):  # Usando Fac en lugar de FuncionFactorial
+            valor = self.evaluar_expresion(expr.expresion, debug)
+            if not isinstance(valor, int) or valor < 0:
+                raise ValueError("Fac solo acepta enteros positivos")
+            return self.calcular_factorial(valor)
+        
+        if isinstance(expr, Sqrt):
+            valor = self.evaluar_expresion(expr.expresion, debug)
+            if not isinstance(valor, (int, float)) or valor < 0:
+                raise ValueError("Sqrt solo acepta números positivos")
+            return math.sqrt(valor)
+        
+        if isinstance(expr, Pow):
+            base = self.evaluar_expresion(expr.base, debug)
+            exponente = self.evaluar_expresion(expr.exponente, debug)
+            try:
+                resultado = base ** exponente
+                if debug:
+                    print(f"[DEBUG] Calculando {base}^{exponente} = {resultado}")
+                return resultado
+            except Exception as e:
+                raise ValueError(f"Error en Pow: {str(e)}")
+
+
         if isinstance(expr, Numero):
+            return expr.valor
+        
+        if isinstance(expr, Booleano):
             return expr.valor
         if isinstance(expr, Variable):
         # Manejar acceso a atributos (ej: p.nombre)
@@ -264,38 +306,86 @@ class Interpreter:
                 return not valor
             else:
                 raise ValueError(f"Operador unario no soportado: {expr.operador}")
+        
+        elif isinstance(expr, Inp):
+            # Mostrar mensaje si existe
+            if expr.mensaje:
+                mensaje = str(self.evaluar_expresion(expr.mensaje, debug))
+                print(mensaje, end=' ')  # Mostrar el mensaje sin salto de línea
+            # Leer entrada del usuario
+            try:
+                user_input = input()
+                # Intentar convertir a número si es posible
+                try:
+                    if '.' in user_input:
+                        return float(user_input)
+                    return int(user_input)
+                except ValueError:
+                    return user_input  # Devolver como string si no es número
+            except EOFError:
+                return ""  # Devolver string vacío si hay error de entrada
+
         else:
             raise ValueError(f"Tipo de expresión no soportada: {type(expr)}")
 
     def evaluar_if(self, nodo_if, debug=False):
         if debug:
-            print(f"\n[DEBUG] Evaluando If como expresión: {nodo_if.condicion}")
+            print(f"\n[DEBUG] Evaluando condición If: {nodo_if.condicion}")
         
-        # Evaluar condición principal
         condicion = self.evaluar_expresion(nodo_if.condicion, debug)
+        
+        if debug:
+            print(f"[DEBUG] Resultado condición: {condicion}")
+            print(f"[DEBUG] Cuerpo If contiene {len(nodo_if.cuerpo)} declaraciones")
         
         if condicion:
             if debug:
-                print("[DEBUG] Retornando resultado del cuerpo If")
-            for stmt in nodo_if.cuerpo:
-                return self.evaluar_expresion(stmt, debug)
-        else:
-            # Procesar Elifs
-            for cond, cuerpo in nodo_if.elifs:
-                if self.evaluar_expresion(cond, debug):
-                    if debug:
-                        print("[DEBUG] Retornando resultado del cuerpo Elif")
-                    for stmt in cuerpo:
-                        return self.evaluar_expresion(stmt, debug)
-            # Procesar Else si no se ejecutó If ni Elifs
-            if nodo_if.else_cuerpo:
-                if debug:
-                    print("[DEBUG] Retornando resultado del cuerpo Else")
-                for stmt in nodo_if.else_cuerpo:
-                    return self.evaluar_expresion(stmt, debug)
+                print(f"[DEBUG] Ejecutando bloque if con {len(nodo_if.cuerpo)} declaraciones")
+            # Guardar estado de memoria antes del bloque
+            memoria_anterior = self.memoria.copy()
+            try:
+                for declaracion in nodo_if.cuerpo:
+                    self.ejecutar([declaracion], debug)
+            except Exception as e:
+                # Restaurar memoria en caso de error
+                self.memoria = memoria_anterior
+                raise
+            
+            return True
         
-        return None  # Si no se ejecuta ningún bloque
-
+        # Procesar ELIFs si la condición principal fue falsa
+        for cond, cuerpo in nodo_if.elifs:
+            if self.evaluar_expresion(cond, debug):
+                memoria_anterior = self.memoria.copy()
+                try:
+                    for declaracion in cuerpo:
+                        self.ejecutar([declaracion], debug)
+                except Exception as e:
+                    self.memoria = memoria_anterior
+                    raise
+                return True
+        
+        # Procesar ELSE si todas las condiciones anteriores fueron falsas
+        if nodo_if.else_cuerpo:
+            if debug:
+                print("[DEBUG] Ejecutando bloque Else")
+            memoria_anterior = self.memoria.copy()
+            try:
+                for declaracion in nodo_if.else_cuerpo:
+                    self.ejecutar([declaracion], debug)
+            except Exception as e:
+                self.memoria = memoria_anterior
+                raise
+        
+        return False
+    
+    def calcular_factorial(self, n):
+        if n == 0:
+            return 1
+        resultado = 1
+        for i in range(1, n + 1):
+            resultado *= i
+        return resultado
 
     def evaluar_bloque(self, bloque, debug=False):
         resultado = None
@@ -336,3 +426,5 @@ class Interpreter:
                     print(f"  => {log_entry['output']}")
                 if log_entry['error']:
                     print(f"  !!! ERROR: {log_entry['error']['message']}")
+
+
