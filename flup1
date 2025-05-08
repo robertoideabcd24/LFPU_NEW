@@ -8,7 +8,7 @@ from lexer import Lexer
 from parser import Parser, Asignacion, OperacionBinaria, Numero, Variable, Cadena, Prt, Bloque, If
 from interprete import Interpreter
 from colors import Colors
-from base import Asignacion, OperacionBinaria, Numero, Variable, Cadena, Prt, Bloque, If ,Booleano, Clase, CreacionInstancia, InstanciaClase, Fac, Sqrt, Pow, Inp
+from base import Asignacion, OperacionBinaria, Numero, Variable, Cadena, Prt, Bloque, If ,Booleano, Clase, CreacionInstancia, InstanciaClase, Fac, Sqrt, Pow, Inp, Rnd
 from flup_logger import BasicFlupLogger
 
 # Configuración inicial para el modo bot
@@ -51,6 +51,7 @@ def _imprimir_nodo(node, prefijo, es_ultimo):
         print(f"Asignacion({node.nombre_var})")
         nuevo_prefijo = prefijo + ("    " if es_ultimo else "│   ")
         _imprimir_nodo(node.valor, nuevo_prefijo, True)
+        return  # Añadir return para evitar procesamiento adicional
 
     elif isinstance(node, Fac):
         print(f"Fac(", end="")
@@ -144,6 +145,24 @@ def _imprimir_nodo(node, prefijo, es_ultimo):
                 _imprimir_nodo(node.mensaje, nuevo_prefijo, True)
         else:
             print("Inp()")
+
+    elif isinstance(node, Rnd):
+        if hasattr(node, 'min_val') and hasattr(node, 'max_val'):
+            if node.min_val is not None and node.max_val is not None:
+                print("Rnd(")
+                nuevo_prefijo = prefijo + ("    " if es_ultimo else "│   ")
+                print(nuevo_prefijo + "├── Min:")
+                _imprimir_nodo(node.min_val, nuevo_prefijo + "│   ", False)
+                print(nuevo_prefijo + "└── Max:")
+                _imprimir_nodo(node.max_val, nuevo_prefijo + "    ", True)
+            elif node.min_val is not None:
+                print("Rnd(0, ")
+                nuevo_prefijo = prefijo + ("    " if es_ultimo else "│   ")
+                _imprimir_nodo(node.min_val, nuevo_prefijo, True)
+                print(nuevo_prefijo + ")")
+        else:
+            print("Rnd()")
+        return
 
     else:
         print(f"Tipo de nodo desconocido: {type(node)}")

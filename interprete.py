@@ -1,8 +1,9 @@
 import os
-from base import Numero, Variable, OperacionBinaria, Asignacion, Prt, Cadena, OperacionUnaria, If, Bloque, Booleano, Clase, CreacionInstancia, InstanciaClase, ExitCommand, AsignacionAtributo, Fac, Sqrt, Pow, Inp
+from base import Numero, Variable, OperacionBinaria, Asignacion, Prt, Cadena, OperacionUnaria, If, Bloque, Booleano, Clase, CreacionInstancia, InstanciaClase, ExitCommand, AsignacionAtributo, Fac, Sqrt, Pow, Inp, Rnd
 from flup_logger import BasicFlupLogger, json
 from colors import Colors
 import math
+import random
 
 class Interpreter:
     def __init__(self):
@@ -222,6 +223,24 @@ class Interpreter:
             except Exception as e:
                 raise ValueError(f"Error en Pow: {str(e)}")
 
+        # Agrega este caso para Rnd()
+        if isinstance(expr, Rnd):
+            
+            # Evaluar los valores mínimos/máximos si existen
+            min_val = 0
+            max_val = 1
+            
+            if hasattr(expr, 'min_val') and expr.min_val is not None:
+                min_val = self.evaluar_expresion(expr.min_val)
+                if not isinstance(min_val, (int, float)):
+                    raise TypeError("El valor mínimo debe ser numérico")
+            
+            if hasattr(expr, 'max_val') and expr.max_val is not None:
+                max_val = self.evaluar_expresion(expr.max_val)
+                if not isinstance(max_val, (int, float)):
+                    raise TypeError("El valor máximo debe ser numérico")
+            
+            return random.uniform(float(min_val), float(max_val))
 
         if isinstance(expr, Numero):
             return expr.valor
@@ -426,5 +445,3 @@ class Interpreter:
                     print(f"  => {log_entry['output']}")
                 if log_entry['error']:
                     print(f"  !!! ERROR: {log_entry['error']['message']}")
-
-

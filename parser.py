@@ -1,4 +1,4 @@
-from base import Numero, Variable, OperacionBinaria, Asignacion, Prt, Cadena, OperacionUnaria, Booleano, If, Bloque, Clase, CreacionInstancia, InstanciaClase, Atributo, AsignacionAtributo, Fac, Sqrt, Pow, Inp
+from base import Numero, Variable, OperacionBinaria, Asignacion, Prt, Cadena, OperacionUnaria, Booleano, If, Bloque, Clase, CreacionInstancia, InstanciaClase, Atributo, AsignacionAtributo, Fac, Sqrt, Pow, Inp, Rnd
 # convertir la lista de tokens en un AST (Árbol de Sintaxis Abstracta)
 class Parser:
    
@@ -733,6 +733,26 @@ class Parser:
         
         if self._verificar('POW'):
             return self.declaracion_pow()
+        
+        if self._verificar('RND'):
+            self.posicion += 1
+            self._consumir('PAREN_IZQ', "Se esperaba '(' después de Rnd")
+            
+            # Verificar si hay parámetros
+            if not self._verificar('PAREN_DER'):
+                min_expr = self.expresion()  # Devuelve un nodo (Numero, Variable, etc)
+                
+                if self._verificar('COMA'):
+                    self.posicion += 1
+                    max_expr = self.expresion()
+                    self._consumir('PAREN_DER', "Se esperaba ')' después de Rnd")
+                    return Rnd(min_expr, max_expr)
+                else:
+                    self._consumir('PAREN_DER', "Se esperaba ')' después de Rnd")
+                    return Rnd(Numero(0), min_expr)  # Envuelve el 0 en un nodo Numero
+            else:
+                self.posicion += 1
+                return Rnd()
         
         if token[0] == 'ENTERO':
             valor = int(self.tokens[self.posicion][1])

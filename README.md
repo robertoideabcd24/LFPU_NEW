@@ -50,3 +50,4 @@ Funciones artimeticas
 - Fac(x)
 - Sqrt(x)
 - Pow(x)
+- Rnd(var), Rnd(num), Rnd(min, max)

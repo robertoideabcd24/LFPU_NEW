@@ -87,6 +87,7 @@ class Lexer:
             'sqrt': 'SQRT',
             'pow': 'POW',
             'inp': 'INP', 
+            'rnd': 'RND'
         }
         
         return (reservadas.get(resultado.lower(), 'ID'), resultado)

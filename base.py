@@ -182,3 +182,15 @@ class Inp:
         if self.mensaje:
             return f"Inp({self.mensaje})"
         return "Inp()"
+    
+class Rnd:
+    def __init__(self, min_val=None, max_val=None):
+        self.min_val = min_val
+        self.max_val = max_val
+    
+    def __repr__(self):
+        if self.min_val is not None and self.max_val is not None:
+            return f"Rnd({self.min_val}, {self.max_val})"
+        elif self.min_val is not None:
+            return f"Rnd(0, {self.min_val})"
+        return "Rnd()"
