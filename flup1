@@ -1,14 +1,42 @@
 #!/usr/bin/env python3
 import sys
 import os
+import readline  
+import time
+import pexpect # type: ignore
 from lexer import Lexer
-from parser import Parser, Asignacion, Numero, OperacionBinaria, Variable
+from parser import Parser, Asignacion, OperacionBinaria, Numero, Variable, Cadena, Prt, Bloque, If
 from interprete import Interpreter
+from colors import Colors
+from base import Asignacion, OperacionBinaria, Numero, Variable, Cadena, Prt, Bloque, If ,Booleano, Clase, CreacionInstancia, InstanciaClase, Fac, Sqrt, Pow, Inp, Rnd
+from flup_logger import BasicFlupLogger
 
-# Función para imprimir el árbol de sintaxis
+# Configuración inicial para el modo bot
+logger = BasicFlupLogger()
+
+def escribir_como_humano(consola, texto, delay=0.03):
+    for char in texto:
+        consola.send(char)
+        sys.stdout.write(char)
+        sys.stdout.flush()
+        time.sleep(delay)
+    consola.sendline("")  # Simula los Enter que da
+    print()  # hace el salto de linea en consola
+
+def imprimir_lento(texto, delay=0.01):
+    for char in texto:
+        sys.stdout.write(char)
+        sys.stdout.flush()
+        time.sleep(delay)
+    #print()
+
 def imprimir_arbol_sintaxis(nodes):
+    if not nodes:  # Si no hay nodos
+        print("(Árbol vacío)")
+        return
+        
     if not isinstance(nodes, list):
-        nodes = [nodes]  # Convierte nodo individual en lista
+        nodes = [nodes]
         
     print("\nÁrbol de Sintaxis Abstracta (AST):")
     for i, node in enumerate(nodes):
@@ -20,80 +48,363 @@ def _imprimir_nodo(node, prefijo, es_ultimo):
     print(prefijo + marcador, end="")
     
     if isinstance(node, Asignacion):
-        print(f"Asignacion({node.nombre_var} = {node.valor})")
+        print(f"Asignacion({node.nombre_var})")
         nuevo_prefijo = prefijo + ("    " if es_ultimo else "│   ")
         _imprimir_nodo(node.valor, nuevo_prefijo, True)
+        return  # Añadir return para evitar procesamiento adicional
+
+    elif isinstance(node, Fac):
+        print(f"Fac(", end="")
+        if isinstance(node.expresion, (Numero, Variable, Cadena)):
+            # Mostrar directamente si es simple
+            print(f"{node.expresion})")
+        else:
+            print("...)")
+            nuevo_prefijo = prefijo + ("    " if es_ultimo else "│   ")
+            _imprimir_nodo(node.expresion, nuevo_prefijo, True)
+
+    elif isinstance(node, Sqrt):
+        print(f"Sqrt(", end="")
+        if isinstance(node.expresion, (Numero, Variable, Cadena)):
+            print(f"{node.expresion})")
+        else:
+            print("...)")
+            nuevo_prefijo = prefijo + ("    " if es_ultimo else "│   ")
+            _imprimir_nodo(node.expresion, nuevo_prefijo, True)
+
+    elif isinstance(node, Pow):
+        print(f"Pow(base, exponente)")
+        nuevo_prefijo = prefijo + ("    " if es_ultimo else "│   ")
+        print(nuevo_prefijo + "├── Base:")
+        _imprimir_nodo(node.base, nuevo_prefijo + "│   ", False)
+        print(nuevo_prefijo + "└── Exponente:")
+        _imprimir_nodo(node.exponente, nuevo_prefijo + "    ", True)
+
+    elif isinstance(node, Clase):
+        print(f"Clase({node.nombre})")
+        nuevo_prefijo = prefijo + ("    " if es_ultimo else "│   ")
+        for i, atributo in enumerate(node.atributos):
+            print(nuevo_prefijo + ("└── " if i == len(node.atributos)-1 else "├── ") + f"Atributo({atributo})")
+
+    elif isinstance(node, CreacionInstancia):
+        print(f"Instancia({node.nombre_instancia} de {node.nombre_clase})")
+
+    elif isinstance(node, str):
+        print(f"Atributo({node})")
+
     elif isinstance(node, OperacionBinaria):
-        print(f"OperacionBinaria({node.izquierda} {node.operador} {node.derecha})")
+        print(f"OperacionBinaria({node.operador})")
         nuevo_prefijo = prefijo + ("    " if es_ultimo else "│   ")
         _imprimir_nodo(node.izquierda, nuevo_prefijo, False)
         _imprimir_nodo(node.derecha, nuevo_prefijo, True)
-    elif isinstance(node, (Numero, Variable)):
-        print(f"{node.__class__.__name__}({node.valor if isinstance(node, Numero) else node.nombre})")
 
-def ejecutar_archivo(archivo_flup):
-    """Carga y ejecuta un archivo .flup"""
-    if not os.path.exists(archivo_flup):
-        print(f"\033[91mError:\033[0m No se encontró '{archivo_flup}'")
+    elif isinstance(node, Numero):
+        print(f"Numero({node.valor})")
+
+    elif isinstance(node, Variable):
+        print(f"Variable({node.nombre})")
+
+    elif isinstance(node, Cadena):
+        print(f"Cadena('{node.valor}')")
+
+    elif isinstance(node, Prt):
+        print("Prt(...)")
+        nuevo_prefijo = prefijo + ("    " if es_ultimo else "│   ")
+        _imprimir_nodo(node.expresion, nuevo_prefijo, True)
+
+    elif isinstance(node, If):
+        print(f"If(condición: {node.condicion})")
+        nuevo_prefijo = prefijo + ("    " if es_ultimo else "│   ")
+        
+        # Cuerpo If
+        print(nuevo_prefijo + "└── Cuerpo If:")
+        for i, decl in enumerate(node.cuerpo):
+            _imprimir_nodo(decl, nuevo_prefijo + "    ", i == len(node.cuerpo)-1)
+        
+        # Bloques Elif
+        for j, (cond_elif, cuerpo_elif) in enumerate(node.elifs):
+            print(nuevo_prefijo + ("└── " if j == len(node.elifs)-1 and not node.else_cuerpo else "├── ") + f"Elif(condición: {cond_elif})")
+            print(nuevo_prefijo + ("    " if j == len(node.elifs)-1 and not node.else_cuerpo else "│   ") + "└── Cuerpo Elif:")
+            for k, decl in enumerate(cuerpo_elif):
+                _imprimir_nodo(decl, nuevo_prefijo + ("    " if j == len(node.elifs)-1 and not node.else_cuerpo else "│   ") + "    ", k == len(cuerpo_elif)-1)
+        
+        # Bloque Else
+        if node.else_cuerpo:
+            print(nuevo_prefijo + "└── Else:")
+            print(nuevo_prefijo + "    └── Cuerpo Else:")
+            for l, decl in enumerate(node.else_cuerpo):
+                _imprimir_nodo(decl, nuevo_prefijo + "        ", l == len(node.else_cuerpo)-1)
+
+    elif isinstance(node, Inp):
+        if hasattr(node, 'mensaje') and node.mensaje:
+            if isinstance(node.mensaje, Cadena):
+                print(f"Inp(mensaje='{node.mensaje.valor}')")
+            else:
+                print(f"Inp(mensaje=...)")
+                nuevo_prefijo = prefijo + ("    " if es_ultimo else "│   ")
+                _imprimir_nodo(node.mensaje, nuevo_prefijo, True)
+        else:
+            print("Inp()")
+
+    elif isinstance(node, Rnd):
+        if hasattr(node, 'min_val') and hasattr(node, 'max_val'):
+            if node.min_val is not None and node.max_val is not None:
+                print("Rnd(")
+                nuevo_prefijo = prefijo + ("    " if es_ultimo else "│   ")
+                print(nuevo_prefijo + "├── Min:")
+                _imprimir_nodo(node.min_val, nuevo_prefijo + "│   ", False)
+                print(nuevo_prefijo + "└── Max:")
+                _imprimir_nodo(node.max_val, nuevo_prefijo + "    ", True)
+            elif node.min_val is not None:
+                print("Rnd(0, ")
+                nuevo_prefijo = prefijo + ("    " if es_ultimo else "│   ")
+                _imprimir_nodo(node.min_val, nuevo_prefijo, True)
+                print(nuevo_prefijo + ")")
+        else:
+            print("Rnd()")
+        return
+
+    else:
+        print(f"Tipo de nodo desconocido: {type(node)}")
+
+
+def modo_interactivo():
+    """Modo consola interactiva mejorado"""
+    print(f"{Colors.TITULO}FLUP V1 (Abril 2025) - Intérprete Interactivo. {Colors.RESET}")
+    print(f"{Colors.TITULO}Data Byte Fortress (México).{Colors.RESET}")
+    
+    interprete = Interpreter()
+    empty_line_count = 0
+    
+    while True:
+        try:
+            entrada = input(f"{Colors.VARIABLE}flup>{Colors.RESET} ").strip()
+            
+            if entrada.lower() == 'exit':
+                break
+                
+            if not entrada:
+                empty_line_count += 1
+                if empty_line_count >= 2:
+                    print(f"\n{Colors.TITULO}=== Memoria ==={Colors.RESET}")
+                    interprete.imprimir_memoria()
+                    print()
+                    empty_line_count = 0
+                continue
+            else:
+                empty_line_count = 0
+            
+            try:
+                lexer = Lexer(entrada)
+                tokens = lexer.tokenizar()
+                parser = Parser(tokens)
+                ast = parser.analizar()
+                
+                resultado = interprete.ejecutar(ast)
+                
+                if resultado is not None:
+                    print(str(resultado))
+                    
+                # Registrar ejecución exitosa
+                logger.log_execution(
+                    source_code=entrada,
+                    output=str(resultado),
+                    metadata={"modo": "interactivo"},
+                    command_type="user_input"
+                )
+                
+            except Exception as e:
+                logger.log_error(entrada, e)
+                print(f"{Colors.FAIL}Error: {str(e)}{Colors.RESET}")
+                
+        except KeyboardInterrupt:
+            print("\nEjecución interrumpida")
+            break
+        except Exception as e:
+            print(f"{Colors.FAIL}Error inesperado: {str(e)}{Colors.RESET}")
+            logger.log_error("", e)
+
+
+def aplicar_colores(texto):
+    """Aplicar colores a los elementos del código"""
+    # Tokenizar el texto para identificar elementos
+    lexer = Lexer(texto)
+    tokens = lexer.tokenizar()
+    
+    resultado = []
+    for token_type, token_value in tokens:
+        if token_type == 'ID':
+            resultado.append(f"{Colors.VARIABLE}{token_value}{Colors.RESET}")
+        elif token_type in ('ENTERO', 'FLOTANTE'):
+            resultado.append(f"{Colors.NUMERO}{token_value}{Colors.RESET}")
+        elif token_type in ('SUMA', 'RESTA', 'MULT', 'DIV'):
+            resultado.append(f"{Colors.OPERADOR}{token_value}{Colors.RESET}")
+        elif token_type == 'ASIGNACION':
+            resultado.append(f"{Colors.ASIGNACION}{token_value}{Colors.RESET}")
+        else:
+            resultado.append(token_value)
+    
+    return ' '.join(resultado)
+
+def modo_script(archivo, debug=False):
+    """Ejecutar un archivo script"""
+    if not os.path.exists(archivo):
+        print(f"{Colors.FAIL}Error:{Colors.RESET} Archivo no encontrado")
         return
 
     try:
-        # Leer contenido del archivo
-        with open(archivo_flup, 'r') as f:
-            contenido = f.read().strip()
+        with open(archivo, 'r') as f:
+            contenido = f.read()
 
-        # Tokenizar el contenido
+        #si debug = True, muestra el AST
+        if debug:
+            print(f"{Colors.TITULO}=== Modo AST (Debug) ==={Colors.RESET}")
+            lexer = Lexer(contenido)
+            tokens = lexer.tokenizar()
+            print(f"\nTokens: {tokens}")
+            parser = Parser(tokens)
+            ast = parser.analizar()
+            imprimir_arbol_sintaxis(ast)
+            print(f"{Colors.TITULO}====================={Colors.RESET}\n")
+
+        # si debug = False, solo ejecuta el script
+        # si debug = True, los mostradoen el script se muestra en medio
+        interprete = Interpreter()
         lexer = Lexer(contenido)
         tokens = lexer.tokenizar()
-        print("\nTokens identificados:", tokens)
-
-        # Analizar los tokens
         parser = Parser(tokens)
         ast = parser.analizar()
-
-        # Mostrar el árbol de sintaxis abstracta
-        print("\nÁrbol de Sintaxis Abstracta (AST):")
-        imprimir_arbol_sintaxis(ast[0]) if ast else print("No hay declaraciones para analizar")
-
-        # Ejecutar el AST
-        interprete = Interpreter()
         resultado = interprete.ejecutar(ast)
 
-        print(f"\nResultado de la ejecución de {archivo_flup}: {resultado}")
+        logger.log_execution(
+            source_code=contenido,
+            output=str(resultado),
+            metadata={"modo": "archivo"},
+            command_type="script_run"
+        )
 
-        # Mostrar el estado de la memoria
-        print("\nEstado de la memoria después de la ejecución:")
-        interprete.imprimir_memoria()
+        # si debud = True, muestra la memoria final
+        if debug:
+            print(f"\n{Colors.TITULO}=== Estado final de memoria ==={Colors.RESET}")
+            for var, valor in interprete.memoria.items():
+                print(f"{var}: {valor}")
+            print(f"{Colors.TITULO}=============================={Colors.RESET}")
 
-    except FileNotFoundError:
-        print(f"\n\033[91mError\033[0m: No se encontró el archivo '{archivo_flup}'")
-    
-    except SyntaxError as e:
-        print(f"\n\033[91mERROR DE SINTÁXIS:\033[0m {str(e)}")
-        
-        # Mostrar contenido del archivo con números de línea
-        if os.path.exists(archivo_flup):
-            print("\nArchivo con error:")
-            with open(archivo_flup, 'r') as f:
-                for i, line in enumerate(f, 1):
-                    print(f"{i}: {line.rstrip()}")
-    
     except Exception as e:
-        print(f"\n\033[91mERROR INESPERADO:\033[0m {str(e)}")
-        import traceback
-        traceback.print_exc()
+        logger.log_error(source_code=contenido, exception=e)
+        print(f"{Colors.FAIL}Error en script: {str(e)}{Colors.RESET}")
 
-    finally:
-        print("\n----- Ejecución completada -----")
-
-def main():
-    if len(sys.argv) < 2:
-        print("Uso: flup <archivo1.flup> [archivo2.flup ...]")
+def ejecutar_como_bot(archivo):
+    """Ejecuta un script FLUP mostrando solo los Prt y la memoria"""
+    if not os.path.exists(archivo):
+        print(f"{Colors.FAIL}Error:{Colors.RESET} Archivo no encontrado")
         return
 
-    for archivo in sys.argv[1:]:
-        print(f"Ejecutando {archivo}...")
-        ejecutar_archivo(archivo)
+    print(f"{Colors.TITULO}FLUP V1 (Abril 2025) - Intérprete Interactivo BOT GRF-3X.{Colors.RESET}")
+    print(f"{Colors.TITULO}Data Byte Fortress (México).{Colors.RESET}")
+
+    child = pexpect.spawn(f'{sys.executable} {__file__} v1', encoding='utf-8', timeout=10)
+    child.setecho(False)
+    child.setwinsize(40, 120)
+    
+    try:
+        child.expect('flup>')
+        empty_line_count = 0
+        in_prt_output = False
+        
+        with open(archivo, 'r') as f:
+            for line in f:
+                line = line.strip()
+                
+                # Mostrar prompt y simular tecleo
+                if line:
+                    print(f"{Colors.VARIABLE}flup>{Colors.RESET} ", end='', flush=True)
+                    for char in line:
+                        print(char, end='', flush=True)
+                        time.sleep(0.05)
+                    print()
+                
+                # Enviar comando al intérprete
+                child.sendline(line)
+                
+                # Manejo especial para Prt para que se ven en el prompt
+                if line.startswith('Prt(') or line.startswith('Prt ('):
+                    in_prt_output = True
+                
+                if not line:
+                    empty_line_count += 1
+                    if empty_line_count == 2:
+                        try:
+                            child.sendline('')
+                            child.sendline('')
+                            child.expect('=== Memoria ===')
+                            child.expect('flup>')
+                            memory_output = child.before
+                            print(f"\n{Colors.TITULO}=== Memoria ==={Colors.RESET}")
+                            mem_lines = [ln.strip() for ln in memory_output.split('\n') 
+                                    if ln.strip() and '===' not in ln]
+                            print('\n'.join(mem_lines))
+                            print(f"{Colors.TITULO}==============={Colors.RESET}\n")
+                        except pexpect.TIMEOUT:
+                            pass
+                else:
+                    empty_line_count = 0
+                    
+                    try:
+                        child.expect('flup>', timeout=1)
+                        output = child.before.strip()
+                        # Solo mostrar el output si es de un Prt o hay error
+                        if in_prt_output or 'Error' in output:
+                            print(output)
+                        in_prt_output = False
+                    except pexpect.TIMEOUT:
+                        pass
+        
+        print(f"{Colors.VARIABLE}flup>{Colors.RESET} exit")
+        child.sendline('exit')
+        child.expect(pexpect.EOF)
+        print(f"{Colors.EXITO}Ejecución completada{Colors.RESET}")
+        
+    except Exception as e:
+        print(f"{Colors.FAIL}Error en modo bot: {str(e)}{Colors.RESET}")
+    finally:
+        child.close()
+
+def main():
+    try:
+        if len(sys.argv) == 1:
+            modo_interactivo()
+        elif len(sys.argv) == 2:
+            if sys.argv[1] == 'v1':
+                modo_interactivo()
+            elif sys.argv[1].endswith('.flup'):
+                modo_script(sys.argv[1])
+            else:
+                mostrar_ayuda()
+        elif len(sys.argv) == 3:
+            if sys.argv[1] == 'ast':
+                modo_script(sys.argv[2], debug=True)
+            elif sys.argv[1] in ('bot', 'rob'):
+                ejecutar_como_bot(sys.argv[2])
+            else:
+                mostrar_ayuda()
+        else:
+            mostrar_ayuda()
+
+    except KeyboardInterrupt:
+        print("\nEjecución interrumpida por el usuario")
+    except Exception as e:
+        print(f"\n{Colors.FAIL}Error inesperado:{Colors.RESET} {str(e)}")
+
+# muestra las opciones disponibles para usar el interprete
+# ayuda a explicar los diferentes modos de uso
+def mostrar_ayuda():
+    print("Uso:")
+    print("  flup v1          - Modo interactivo")
+    print("  flup script.flup - Ejecutar archivo")
+    print("  flup ast script.flup - Mostrar AST y depurar")
+    print("  flup bot script.flup - Simulación con bot")
+    print("  flup rob script.flup - Modo robot personalizado")
 
 if __name__ == '__main__':
     main()

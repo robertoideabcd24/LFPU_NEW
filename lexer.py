@@ -1,11 +1,14 @@
 import re
 
 class Lexer:
-    def __init__(self, texto_entrada):
+
+    def __init__(self, texto_entrada, debug=False): 
         self.texto_entrada = texto_entrada
         self.tokens = []
         self.caracter_actual = None
         self.posicion = 0
+        # Nuevo parámetro para controlar la salida
+        self.debug = debug  
         self.avanzar()
 
     def error(self):
@@ -24,10 +27,39 @@ class Lexer:
 
     def numero(self):
         resultado = ''
-        while self.caracter_actual is not None and self.caracter_actual.isdigit():
+        tiene_punto = False
+        
+        # Manejar signo negativo (si existe)
+        if self.caracter_actual == '-':
+            resultado += '-'
+            self.avanzar()
+        
+        # Parte entera antes del punto
+        while self.caracter_actual and self.caracter_actual.isdigit():
             resultado += self.caracter_actual
             self.avanzar()
-        return ('ENTERO', int(resultado))
+        
+        # Parte decimal (después del punto)
+        if self.caracter_actual == '.':
+            tiene_punto = True
+            resultado += '.'
+            self.avanzar()
+            while self.caracter_actual and self.caracter_actual.isdigit():
+                resultado += self.caracter_actual
+                self.avanzar()
+        
+        if tiene_punto:
+            return ('FLOTANTE', float(resultado))
+        else:
+            return ('ENTERO', int(resultado))
+        
+    def _ignorar_comentario(self):
+        """Ignora los comentarios (todo desde # hasta el fin de línea)"""
+        while self.caracter_actual is not None and self.caracter_actual != '\n':
+            self.avanzar()
+        # Consumir el salto de línea también
+        if self.caracter_actual == '\n':
+            self.avanzar()
 
     def identificador(self):
         resultado = ''
@@ -35,32 +67,27 @@ class Lexer:
             resultado += self.caracter_actual
             self.avanzar()
 
+        # Manejar booleanos primero
+        if resultado.lower() == 'true':
+            return ('BOOLEANO', True)
+        if resultado.lower() == 'false':
+            return ('BOOLEANO', False)
+
         reservadas = {
+            'prt': 'PRT',
             'and': 'AND',
             'or': 'OR',
             'not': 'NOT',
-            'div': 'DIV',
-            'mod': 'MOD',
             'if': 'IF',
-            'then': 'THEN',
-            'else': 'ELSE',
-            'while': 'WHILE',
-            'do': 'DO',
-            'for': 'FOR',
-            'to': 'TO',
-            'downto': 'DOWNTO',
-            'repeat': 'REPEAT',
-            'until': 'UNTIL',
-            'begin': 'BEGIN',
-            'end': 'END',
-            'var': 'VAR',
-            'integer': 'INTEGER',
-            'boolean': 'BOOLEAN',
-            'true': 'TRUE',
-            'false': 'FALSE',
-            'procedure': 'PROCEDURE',
-            'function': 'FUNCTION',
-            'return': 'RETURN'
+            'eli': 'ELIF',
+            'els': 'ELSE',
+            'class': 'CLASS',
+            'exit': 'EXIT'  ,
+            'fac': 'FAC',
+            'sqrt': 'SQRT',
+            'pow': 'POW',
+            'inp': 'INP', 
+            'rnd': 'RND'
         }
         
         return (reservadas.get(resultado.lower(), 'ID'), resultado)
@@ -68,8 +95,14 @@ class Lexer:
     def obtener_siguiente_token(self):
         try:
             while self.caracter_actual is not None:
-                if self.caracter_actual.isspace():
-                    self.saltar_espacios()
+                
+                if self.caracter_actual == '#':
+                    self._ignorar_comentario()
+                    continue
+
+                # Manejar espacios en blanco
+                if self.caracter_actual in (' ', '\t'):
+                    self.avanzar()
                     continue
 
                 if self.caracter_actual.isdigit():
@@ -94,7 +127,6 @@ class Lexer:
                     num_token = self.numero()
                     return ('ENTERO', -num_token[1])  # Devuelve el número como negativo
 
-
                 if self.caracter_actual == '*':
                     self.avanzar()
                     return ('MULT', '*')
@@ -103,17 +135,32 @@ class Lexer:
                     self.avanzar()
                     return ('DIV', '/')
 
+                # Manejar := con posibles espacios entre : y =
                 if self.caracter_actual == ':':
+                    start_pos = self.posicion
                     self.avanzar()
+                    
+                    # Saltar espacios entre : y =
+                    while self.caracter_actual is not None and self.caracter_actual.isspace():
+                        self.avanzar()
+                        
                     if self.caracter_actual == '=':
                         self.avanzar()
                         return ('ASIGNACION', ':=')
                     else:
-                        self.error()
+                        # Retroceder para manejar solo :
+                        self.posicion = start_pos
+                        self.caracter_actual = ':'
+                        self.avanzar()
+                        return ('DOS_PUNTOS', ':')
 
                 if self.caracter_actual == ';':
                     self.avanzar()
                     return ('PUNTO_COMA', ';')
+                
+                if self.caracter_actual == ',':
+                    self.avanzar()
+                    return ('COMA', ',') 
                 
                 if self.caracter_actual == '<':
                     self.avanzar()
@@ -136,7 +183,34 @@ class Lexer:
                 
                 if self.caracter_actual == '=':
                     self.avanzar()
-                    return ('IGUAL', '=')
+                    if self.caracter_actual == '=':  # Operador de comparación ==
+                        self.avanzar()
+                        return ('IGUAL_IGUAL', '==')
+                    else:
+                        return ('IGUAL', '=')
+                
+                if self.caracter_actual == '!':
+                    self.avanzar()
+                    if self.caracter_actual == '=':
+                        self.avanzar()
+                        return ('DIFERENTE', '!=')
+                    else:
+                        self.error()
+
+                if self.caracter_actual.lower() == 'a' and self.texto_entrada[self.posicion:self.posicion+3].lower() == 'and':
+                    self.posicion += 3
+                    self.caracter_actual = self.texto_entrada[self.posicion] if self.posicion < len(self.texto_entrada) else None
+                    return ('AND', 'and')
+
+                if self.caracter_actual.lower() == 'o' and self.texto_entrada[self.posicion:self.posicion+2].lower() == 'or':
+                    self.posicion += 2
+                    self.caracter_actual = self.texto_entrada[self.posicion] if self.posicion < len(self.texto_entrada) else None
+                    return ('OR', 'or')
+
+                if self.caracter_actual.lower() == 'n' and self.texto_entrada[self.posicion:self.posicion+3].lower() == 'not':
+                    self.posicion += 3
+                    self.caracter_actual = self.texto_entrada[self.posicion] if self.posicion < len(self.texto_entrada) else None
+                    return ('NOT', 'not')
                 
                 if self.caracter_actual == '.':
                     self.avanzar()
@@ -156,6 +230,46 @@ class Lexer:
                 if self.caracter_actual == ')':
                     self.avanzar()
                     return ('PAREN_DER', ')')
+                
+                # Manejar números negativos y flotantes
+                if (self.caracter_actual == '-' and 
+                    self.posicion < len(self.texto_entrada)-1 and 
+                    (self.texto_entrada[self.posicion+1].isdigit() or self.texto_entrada[self.posicion+1] == '.')):
+                    self.avanzar()  # Consume el '-'
+                    num_token = self.numero()
+                    if num_token[0] == 'ENTERO':
+                        return ('ENTERO', -num_token[1])
+                    else:
+                        return ('FLOTANTE', -num_token[1])
+
+                # Manejar números positivos
+                if self.caracter_actual.isdigit() or self.caracter_actual == '.':
+                    return self.numero()
+                
+                if self.caracter_actual == '"':
+                    return self.cadena()
+                
+                # Agregar reconocimiento de booleanos
+                if self.caracter_actual.lower() == 't' and self.texto_entrada[self.posicion:self.posicion+4].lower() == 'true':
+                    self.posicion += 4
+                    self.caracter_actual = self.texto_entrada[self.posicion] if self.posicion < len(self.texto_entrada) else None
+                    return ('BOOLEANO', True)
+                    
+                if self.caracter_actual.lower() == 'f' and self.texto_entrada[self.posicion:self.posicion+5].lower() == 'false':
+                    self.posicion += 5
+                    self.caracter_actual = self.texto_entrada[self.posicion] if self.posicion < len(self.texto_entrada) else None
+                    return ('BOOLEANO', False)
+                
+                # Manejar sangrías (espacios/tabs al inicio de línea)
+                if self.caracter_actual == '\n':
+                    self.avanzar()
+                    espacios = 0
+                    while self.caracter_actual == ' ':
+                        espacios += 1
+                        self.avanzar()
+                    if espacios > 0:
+                        return ('INDENTACION', espacios)
+                    continue
                 
                 # Manejo robusto de :=
                 if self.caracter_actual == ':':
@@ -186,15 +300,42 @@ class Lexer:
         except Exception as e:
             raise SyntaxError(f"Error léxico: {str(e)}")
 
+    # contabiliza el número de líneas segun la posición y se detecte de una mejor forma los errores
     def get_line_number(self, pos):
         return self.texto_entrada.count('\n', 0, pos) + 1
+ 
+    def cadena(self):
+        resultado = ''
+        inicio_pos = self.posicion - 1
+        self.avanzar()  # Saltar la comilla inicial
+        
+        while self.caracter_actual is not None and self.caracter_actual != '"':
+            if self.caracter_actual == '\\':  # Manejar caracteres escapados
+                self.avanzar()
+                if self.caracter_actual == 'n':
+                    resultado += '\n'
+                elif self.caracter_actual == 't':
+                    resultado += '\t'
+                else:
+                    resultado += self.caracter_actual
+                self.avanzar()
+            else:
+                resultado += self.caracter_actual
+                self.avanzar()
+        
+        if self.caracter_actual != '"':
+            linea_error = self.get_line_number(inicio_pos)
+            raise SyntaxError(f'Cadena sin cerrar en la línea {linea_error}')
+        
+        self.avanzar()  # Saltar la comilla final
+        return ('CADENA', resultado)
 
     def tokenizar(self):
         tokens = []
         while True:
             token = self.obtener_siguiente_token()
             
-            if token is None:  # Verificación adicional
+            if token is None:
                 break
                 
             if token[0] in ('EOF', 'FIN_ARCHIVO'):
@@ -205,6 +346,16 @@ class Lexer:
                 continue
                 
             tokens.append(token)
-            print(f"Token reconocido: {token}")  # Debug
+             # Solo mostrar tokens en modo debug
+            if self.debug: 
+                print(f"Token reconocido: {token}")
             
         return tokens
+    
+
+    def _handle_indentation(self):
+        spaces = 0
+        while self.current_char == ' ':
+            spaces += 1
+            self.advance()
+        return ('INDENTACION', spaces) 

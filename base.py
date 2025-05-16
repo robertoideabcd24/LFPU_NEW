@@ -5,7 +5,7 @@ class Numero:
     
     def __repr__(self):
         return f"Numero({self.valor})"
-
+    
 class Variable:
     def __init__(self, nombre):
         self.nombre = nombre
@@ -29,3 +29,168 @@ class Asignacion:
 
     def __repr__(self):
         return f"Asignacion({self.nombre_var} = {self.valor})"
+    
+class Prt:
+    def __init__(self, expresion):
+        # para que acepte una expresión completa
+        self.expresion = expresion  
+    
+    def __repr__(self):
+        return f"Prt({self.expresion})"
+    
+class Cadena:
+    def __init__(self, valor):
+        self.valor = valor
+    
+    def __repr__(self):
+        return f"Cadena('{self.valor}')"
+    
+class Booleano:
+    def __init__(self, valor):
+        self.valor = valor
+    
+    def __repr__(self):
+        return f"Booleano({self.valor})"
+    
+class OperacionUnaria:
+    def __init__(self, operador, expresion):
+        self.operador = operador
+        self.expresion = expresion
+
+    def __repr__(self):
+        return f"OperacionUnaria({self.operador} {self.expresion})"
+    
+class If:
+    def __init__(self, condicion, cuerpo, elifs=None, else_cuerpo=None):
+        self.condicion = condicion
+        self.cuerpo = cuerpo
+        self.elifs = elifs or []
+        self.else_cuerpo = else_cuerpo or []
+
+    def __repr__(self):
+        parts = [f"If({self.condicion}):"]
+        parts.extend(f"  {stmt}" for stmt in self.cuerpo)
+        
+        for cond, cuerpo in self.elifs:
+            parts.append(f"Elif({cond}):")
+            parts.extend(f"  {stmt}" for stmt in cuerpo)
+            
+        if self.else_cuerpo:
+            parts.append("Else:")
+            parts.extend(f"  {stmt}" for stmt in self.else_cuerpo)
+            
+        return "\n".join(parts)
+
+class Bloque:
+    def __init__(self, declaraciones):
+        self.declaraciones = declaraciones
+    
+    def __repr__(self):
+        return f"Bloque({self.declaraciones})"
+    
+class Clase:
+    def __init__(self, nombre, atributos=None, metodos=None):
+        self.nombre = nombre
+        self.atributos = atributos or []
+        self.metodos = metodos or []
+
+    def __repr__(self):
+        return f"Clase({self.nombre}, atributos: {self.atributos})"
+
+class InstanciaClase:
+    def __init__(self, clase):
+        self.clase = clase
+        self.atributos = {nombre: None for nombre in clase.atributos}
+        # Inicializar atributos declarados en la clase
+        for atributo in clase.atributos:
+            self.atributos[atributo] = None
+    
+    def __repr__(self):
+        atribs = ', '.join(f"{k}={v}" for k, v in self.atributos.items())
+        return f"Instancia de {self.clase.nombre} con atributos {self.atributos}"
+    
+    def __getattr__(self, name):
+        if name in self.atributos:
+            if self.atributos[name] is None:
+                raise AttributeError(f"Atributo '{name}' no ha sido asignado")
+            return self.atributos[name]
+        raise AttributeError(f"La clase '{self.clase.nombre}' no tiene atributo '{name}'")
+    
+    def __setattr__(self, name, value):
+        if name in ['clase', 'atributos']:
+            super().__setattr__(name, value)
+        elif name in getattr(self, 'atributos', {}):
+            self.atributos[name] = value
+        else:
+            raise AttributeError(f"La clase '{self.clase.nombre}' no tiene atributo '{name}'")
+    
+class CreacionInstancia:
+    def __init__(self, nombre_instancia, nombre_clase):
+        self.nombre_instancia = nombre_instancia
+        self.nombre_clase = nombre_clase
+    
+    def __repr__(self):
+        return f"CreacionInstancia({self.nombre_instancia} := {self.nombre_clase}())"
+
+class ExitCommand:
+    def __repr__(self):
+        return "ExitCommand()"
+
+class Atributo:
+    def __init__(self, nombre):
+        self.nombre = nombre
+
+    def __repr__(self):
+        return f"Atributo(nombre='{self.nombre}')"
+
+class AsignacionAtributo:
+    def __init__(self, nombre_instancia, nombre_atributo, valor):
+        self.nombre_instancia = nombre_instancia
+        self.nombre_atributo = nombre_atributo
+        self.valor = valor
+    
+    def __repr__(self):
+        return f"AsignacionAtributo({self.nombre_instancia}.{self.nombre_atributo} = {self.valor})"
+    
+class Fac:
+    def __init__(self, expresion):
+        self.expresion = expresion
+    
+    def __repr__(self):
+        return f"Fac({self.expresion})"
+    
+class Sqrt:
+    def __init__(self, expresion):
+        self.expresion = expresion
+    
+    def __repr__(self):
+        return f"Sqrt({self.expresion})"
+    
+class Pow:
+    def __init__(self, base, exponente):
+        self.base = base
+        self.exponente = exponente
+    
+    def __repr__(self):
+        return f"Pow({self.base}, {self.exponente})"
+    
+class Inp:
+    def __init__(self, mensaje=None):
+        self.mensaje = mensaje  
+    
+    def __repr__(self):
+        if self.mensaje:
+            return f"Inp({self.mensaje})"
+        return "Inp()"
+    
+class Rnd:
+    def __init__(self, min_val=None, max_val=None):
+        self.min_val = min_val
+        self.max_val = max_val
+    
+    def __repr__(self):
+        if self.min_val is not None and self.max_val is not None:
+            return f"Rnd({self.min_val}, {self.max_val})"
+        elif self.min_val is not None:
+            return f"Rnd(0, {self.min_val})"
+        return "Rnd()"

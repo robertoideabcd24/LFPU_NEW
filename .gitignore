@@ -1,0 +1,26 @@
+# Ignorar carpetas de pruebas
+tests/
+test2/
+test3/
+test4/
+boot/
+demostracion/
+flup_analysis/
+__pycache__/
+
+# Ignorar archivos con extensión
+*.flup
+*.txt
+*.expected
+# Ignorar scripts de shell
+*.sh
+
+# Ignorar carpetas __pycache__
+**/__pycache__/
+.__pycache__
+.__pycache__/
+# Ignorar archivos y carpetas que comiencen con .venn
+.venn*__pycache__/
+.venv/
+.venn*
+
