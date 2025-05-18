@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 import sys
 import os
-import readline  
+#import readline  
 import time
-import pexpect # type: ignore
+#import pexpect # type: ignore
 from lexer import Lexer
 from parser import Parser, Asignacion, OperacionBinaria, Numero, Variable, Cadena, Prt, Bloque, If
 from interprete import Interpreter
