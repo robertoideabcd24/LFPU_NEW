@@ -10,49 +10,52 @@ class Parser:
         self.pila_indentacion = [0]
         self._en_estructura_control = False 
 
-    def analizar(self):
+    def analizar(self, debug=False):
+        """
+        Analiza los tokens y genera el AST
+        Args:
+            debug: Si True, muestra información de depuración (solo para modo AST)
+        Returns:
+            Lista de nodos del AST
+        """
         declaraciones = []
         
         while self.posicion < len(self.tokens):
             token_actual = self.tokens[self.posicion]
-            declaracion = None
             
-            # Saltar indentación no esperada (no en bloques de control)
-            if token_actual[0] == 'INDENTACION' and not self._en_estructura_control:
+            # Saltar elementos no relevantes
+            if token_actual[0] in ['INDENTACION', 'NUEVA_LINEA'] and not self._en_estructura_control:
                 self.posicion += 1
                 continue
                 
-            # Manejo de nueva línea
-            if token_actual[0] == 'NUEVA_LINEA':
-                self.posicion += 1
-                continue
+            try:
+                declaracion = None
                 
-            # Procesar declaraciones
-            if token_actual[0] == 'ID' and self._verificar_tipo_siguiente('ASIGNACION'):
-                declaracion = self.declaracion_asignacion()
-                
-            elif self._verificar('PRT'):
-                declaracion = self.declaracion_prt()
-                
-            elif self._verificar('IF'):
-                self._en_estructura_control = True
-                declaracion = self.declaracion_if()
-                self._en_estructura_control = False
-                
-            elif self._verificar('ELIF') or self._verificar('ELSE'):
-                raise SyntaxError(f"'{token_actual[1]}' fuera de bloque if")
-                
-            elif token_actual[0] == 'PUNTO_COMA':
-                self.posicion += 1
-                continue
-                
-            else:
-                raise SyntaxError(f"Token inesperado: {token_actual[1]}")
+                if token_actual[0] == 'ID' and self._verificar_tipo_siguiente('ASIGNACION'):
+                    declaracion = self.declaracion_asignacion()
+                elif self._verificar('PRT'):
+                    declaracion = self.declaracion_prt()
+                elif self._verificar('IF'):
+                    self._en_estructura_control = True
+                    declaracion = self.declaracion_if()
+                    self._en_estructura_control = False
+                elif token_actual[0] == 'PUNTO_COMA':
+                    self.posicion += 1
+                    continue
+                else:
+                    raise SyntaxError(f"Token inesperado: {token_actual[1]}")
 
-            if declaracion:
-                declaraciones.append(declaracion)
-        
+                if declaracion:
+                    declaraciones.append(declaracion)
+                    
+            except Exception as e:
+                if debug:  # Solo mostrar errores de parsing en modo debug
+                    print(f"[ERROR Parser] {str(e)}")
+                raise
+
         return declaraciones
+
+    
     
     def _manejar_indentacion(self, nivel):
         if nivel > self.pila_indentacion[-1]:
@@ -114,7 +117,7 @@ class Parser:
 
 
     def expresion(self):
-        return self.expresion_suma()
+        return self.expresion_or()
 
     def expresion_suma(self):
         nodo = self.expresion_multiplicacion()
@@ -144,47 +147,69 @@ class Parser:
     
     # crea nodos binarios para operaciones de comparación
     def expresion_comparacion(self):
-        nodo = self.termino()
+        """
+        Construye nodos para operaciones de comparación
+        (>, <, =, >=, <=, !=)
+        """
+        if self.debug:  # Solo mostrar en modo debug
+            print("\n[DEBUG Parser] Tokens restantes:")
+            for tok in self.tokens[self.posicion:]:
+                print(f"  - {tok[0]}: {tok[1]}")
+        
+        nodo = self.expresion_suma()
+        
+        if self.debug:
+            print(f"[DEBUG Parser] Nodo inicial: {nodo}")
         
         while self.posicion < len(self.tokens) and self.tokens[self.posicion][0] in (
-            'MENOR', 'MENOR_IGUAL', 'MAYOR', 'MAYOR_IGUAL', 'IGUAL_IGUAL', 'DIFERENTE'
+            'IGUAL', 'MENOR', 'MAYOR', 'MENOR_IGUAL', 'MAYOR_IGUAL', 'DIFERENTE'
         ):
             operador = self.tokens[self.posicion][1]
+            
+            if self.debug:
+                print(f"[DEBUG Parser] Operador encontrado: {operador}")
+            
             self.posicion += 1
-            nodo = OperacionBinaria(nodo, operador, self.termino())
+            derecho = self.expresion_suma()
+            nodo = OperacionBinaria(nodo, operador, derecho)
+            
+            if self.debug:
+                print(f"[DEBUG Parser] Nuevo nodo: {nodo}")
         
         return nodo
     
     # crea nodos binarios para operaciones lógicas
     def expresion_or(self):
+        """Maneja operaciones OR (precedencia más baja)"""
         nodo = self.expresion_and()
         
-        while self.posicion < len(self.tokens) and self.tokens[self.posicion][0] == 'OR':
-            operador = self.tokens[self.posicion][1]
-            self.posicion += 1
-            nodo = OperacionBinaria(nodo, operador, self.expresion_and())
+        while self._verificar('OR'):
+            operador = self._consumir('OR')[1]
+            derecho = self.expresion_and()
+            nodo = OperacionBinaria(nodo, operador, derecho)
         
         return nodo
 
     # crea nodos binarios para operaciones lógicas
     def expresion_and(self):
+        """Maneja operaciones AND"""
         nodo = self.expresion_not()
         
-        while self.posicion < len(self.tokens) and self.tokens[self.posicion][0] == 'AND':
-            operador = self.tokens[self.posicion][1]
-            self.posicion += 1
-            nodo = OperacionBinaria(nodo, operador, self.expresion_not())
+        while self._verificar('AND'):
+            operador = self._consumir('AND')[1]
+            derecho = self.expresion_not()
+            nodo = OperacionBinaria(nodo, operador, derecho)
         
         return nodo
 
     # crea nodos unarios para operaciones lógicas
     def expresion_not(self):
-        if self.posicion < len(self.tokens) and self.tokens[self.posicion][0] == 'NOT':
-            operador = self.tokens[self.posicion][1]
-            self.posicion += 1
-            # se cambia de recursión a expresion_comparacion
-            expresion = self.expresion_not()  
+        """Maneja operaciones NOT"""
+        if self._verificar('NOT'):
+            operador = self._consumir('NOT')[1]
+            expresion = self.expresion_not()  # Permite NOT anidados
             return OperacionUnaria(operador, expresion)
+        
         return self.expresion_comparacion()
     
 
@@ -259,6 +284,9 @@ class Parser:
                 raise SyntaxError("Se esperaba un identificador al inicio de asignación")
             
             nombre_var = self.tokens[self.posicion][1]
+            if not nombre_var.isidentifier():
+                raise SyntaxError(f"Nombre de variable inválido: '{nombre_var}'")
+            
             self.posicion += 1
 
             # Verificar si es asignación de atributo
@@ -275,7 +303,7 @@ class Parser:
                     raise SyntaxError("Se esperaba ':=' en asignación de atributo")
                 
                 self.posicion += 1
-                valor = self.expresion()
+                valor = self.expresion_comparacion()  # Cambio clave aquí
                 
                 # Punto y coma opcional
                 if (self.posicion < len(self.tokens)) and (self.tokens[self.posicion][0] == 'PUNTO_COMA'):
@@ -304,12 +332,16 @@ class Parser:
                     
                 return CreacionInstancia(nombre_var, nombre_clase)
 
-            # Verificar si es una función Sqrt()
+            # Verificar si es una función especial (Sqrt, Pow, etc.)
             if self._verificar('SQRT'):
                 valor = self.declaracion_sqrt()
+            elif self._verificar('POW'):
+                valor = self.declaracion_pow()
+            elif self._verificar('FAC'):
+                valor = self.declaracion_fac()
             else:
-                # Asignación normal (x := 5)
-                valor = self.expresion()
+                # Asignación normal (x := 5 < 6, y := 5 = 5, etc.)
+                valor = self.expresion_comparacion()  # Cambio clave aquí
             
             # Punto y coma opcional
             if (self.posicion < len(self.tokens)) and (self.tokens[self.posicion][0] == 'PUNTO_COMA'):
@@ -360,15 +392,15 @@ class Parser:
             self.posicion += 1
             
             # Manejar condición
-            self._consumir('PAREN_IZQ', "Se esperaba '(' después de 'if'")
+            self._consumir('PAREN_IZQ', "Se esperaba '(' después de 'If'")
             condicion = self.expresion_or()
-            self._consumir('PAREN_DER', "Se esperaba ')' después de condición if")
-            self._consumir('DOS_PUNTOS', "Se esperaba ':' después de condición if")
+            self._consumir('PAREN_DER', "Se esperaba ')' después de condición If")
+            self._consumir('DOS_PUNTOS', "Se esperaba ':' después de condición If")
             
             # Manejar indentación
             self._saltar_nuevas_lineas()
             if self.posicion >= len(self.tokens) or self.tokens[self.posicion][0] != 'INDENTACION':
-                raise SyntaxError("Se esperaba indentación después de if")
+                raise SyntaxError("Se esperaba indentación después de If")
             nivel_indentacion = self.tokens[self.posicion][1]
             self.posicion += 1
             

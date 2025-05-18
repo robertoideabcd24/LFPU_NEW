@@ -1,12 +1,14 @@
 # Ignorar carpetas de pruebas
-tests/
+test/
 test2/
 test3/
 test4/
+build/
 boot/
 demostracion/
 flup_analysis/
 __pycache__/
+venv/
 
 # Ignorar archivos con extensión
 *.flup
@@ -14,6 +16,8 @@ __pycache__/
 *.expected
 # Ignorar scripts de shell
 *.sh
+*.spec
+*.gitignore
 
 # Ignorar carpetas __pycache__
 **/__pycache__/

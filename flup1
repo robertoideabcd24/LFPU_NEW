@@ -170,7 +170,7 @@ def _imprimir_nodo(node, prefijo, es_ultimo):
 
 def modo_interactivo():
     """Modo consola interactiva mejorado"""
-    print(f"{Colors.TITULO}FLUP V1 (Abril 2025) - Intérprete Interactivo. {Colors.RESET}")
+    print(f"{Colors.TITULO}FLUP V1 (Mayo 2025) - Intérprete Interactivo. {Colors.RESET}")
     print(f"{Colors.TITULO}Data Byte Fortress (México).{Colors.RESET}")
     
     interprete = Interpreter()
@@ -256,42 +256,33 @@ def modo_script(archivo, debug=False):
         with open(archivo, 'r') as f:
             contenido = f.read()
 
-        #si debug = True, muestra el AST
-        if debug:
-            print(f"{Colors.TITULO}=== Modo AST (Debug) ==={Colors.RESET}")
-            lexer = Lexer(contenido)
-            tokens = lexer.tokenizar()
-            print(f"\nTokens: {tokens}")
-            parser = Parser(tokens)
-            ast = parser.analizar()
-            imprimir_arbol_sintaxis(ast)
-            print(f"{Colors.TITULO}====================={Colors.RESET}\n")
-
-        # si debug = False, solo ejecuta el script
-        # si debug = True, los mostradoen el script se muestra en medio
-        interprete = Interpreter()
+        # Procesamiento común
         lexer = Lexer(contenido)
         tokens = lexer.tokenizar()
         parser = Parser(tokens)
-        ast = parser.analizar()
-        resultado = interprete.ejecutar(ast)
 
-        logger.log_execution(
-            source_code=contenido,
-            output=str(resultado),
-            metadata={"modo": "archivo"},
-            command_type="script_run"
-        )
-
-        # si debud = True, muestra la memoria final
+        # Modo AST/Debug
         if debug:
-            print(f"\n{Colors.TITULO}=== Estado final de memoria ==={Colors.RESET}")
-            for var, valor in interprete.memoria.items():
-                print(f"{var}: {valor}")
-            print(f"{Colors.TITULO}=============================={Colors.RESET}")
+            print(f"{Colors.TITULO}=== Modo AST (Debug) ==={Colors.RESET}")
+            print("\n● Tokens reconocidos:")
+            for i, token in enumerate(tokens, 1):
+                print(f"  {i:2d}. {token[0]}: {token[1]}")
+            
+            ast = parser.analizar(debug=True)
+            print(f"\n● Árbol de Sintaxis Abstracta:")
+            imprimir_arbol_sintaxis(ast)
+            
+            print(f"\n● Ejecución:")
+            interprete = Interpreter()
+            interprete.ejecutar(ast, debug_mode=True)
+            return
+
+        # Modo normal (sin debug)
+        ast = parser.analizar()  # Sin debug
+        interprete = Interpreter()
+        interprete.ejecutar(ast)  # Solo mostrará Prt/Inp
 
     except Exception as e:
-        logger.log_error(source_code=contenido, exception=e)
         print(f"{Colors.FAIL}Error en script: {str(e)}{Colors.RESET}")
 
 def ejecutar_como_bot(archivo):
@@ -300,7 +291,7 @@ def ejecutar_como_bot(archivo):
         print(f"{Colors.FAIL}Error:{Colors.RESET} Archivo no encontrado")
         return
 
-    print(f"{Colors.TITULO}FLUP V1 (Abril 2025) - Intérprete Interactivo BOT GRF-3X.{Colors.RESET}")
+    print(f"{Colors.TITULO}FLUP V1 (Mayo 2025) - Intérprete Interactivo BOT GRF-3X.{Colors.RESET}")
     print(f"{Colors.TITULO}Data Byte Fortress (México).{Colors.RESET}")
 
     child = pexpect.spawn(f'{sys.executable} {__file__} v1', encoding='utf-8', timeout=10)

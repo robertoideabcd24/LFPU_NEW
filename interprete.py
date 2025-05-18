@@ -14,137 +14,92 @@ class Interpreter:
         self.logger = BasicFlupLogger() 
         self.ambitos = [{}]
 
-    def ejecutar(self, ast, debug=False):
-        self.debug = debug
-        self.memoria = {}
-        self.clases = {}
-
-        # Asegurarse de que ast sea una lista, incluso si es un solo nodo
+    def ejecutar(self, ast, debug_mode=False):
+        """
+        Ejecuta los nodos del AST
+        Args:
+            ast: Nodo o lista de nodos a ejecutar
+            debug_mode: True para mostrar información de depuración
+        """
         if not isinstance(ast, (list, tuple)):
             ast = [ast]
         
         for nodo in ast:
             try:
-                if isinstance(nodo, Prt):
-                    valor = self.evaluar_expresion(nodo.expresion)
+                if debug_mode:
+                    print(f"[DEBUG] Procesando nodo: {type(nodo).__name__}")
+                
+                if isinstance(nodo, Asignacion):
+                    # Evaluar el valor de la asignación
+                    valor = self.evaluar_expresion(nodo.valor, debug_mode)
+                    # Guardar en memoria
+                    self.memoria[nodo.nombre_var] = valor
+                    if debug_mode:
+                        print(f"[DEBUG] Asignado {nodo.nombre_var} = {valor}")
+                
+                elif isinstance(nodo, Prt):
+                    valor = self.evaluar_expresion(nodo.expresion, debug_mode)
                     if not self.silent_mode:
                         print(valor)
-                    # Registrar en el log
                     self.logger.log_execution(
                         source_code=f"Prt({nodo.expresion})",
                         output=str(valor),
-                        metadata={
-                            "type": "print",
-                            "memory_snapshot": self.memoria.copy()
-                        }
+                        metadata={"type": "print", "memory_snapshot": self.memoria.copy()}
                     )
 
-                if isinstance(nodo, Fac):
-                    valor = self.evaluar_expresion(nodo.expresion)
+                elif isinstance(nodo, Fac):
+                    valor = self.evaluar_expresion(nodo.expresion, debug_mode)
                     resultado = self.calcular_factorial(valor)
-                    print(resultado) 
+                    print(resultado)
 
                 elif isinstance(nodo, Clase):
                     self.clases[nodo.nombre] = nodo
-                    if debug:
+                    if debug_mode:
                         print(f"[DEBUG] Clase definida: {nodo.nombre}")
 
                 elif isinstance(nodo, CreacionInstancia):
                     if nodo.nombre_clase not in self.clases:
                         raise NameError(f"Clase no definida: {nodo.nombre_clase}")
-                    
-                    # Crear instancia con atributos
                     atributos = {a.nombre: None for a in self.clases[nodo.nombre_clase].atributos}
                     self.memoria[nodo.nombre_instancia] = {
                         '__clase__': nodo.nombre_clase,
                         '__atributos__': atributos
                     }
-                    
-                    if debug:
+                    if debug_mode:
                         print(f"[DEBUG] Instancia creada: {nodo.nombre_instancia}")
 
                 elif isinstance(nodo, AsignacionAtributo):
-                    if nodo.objeto not in self.memoria:
-                        raise NameError(f"Instancia no existe: {nodo.objeto}")
-                    
-                    instancia = self.memoria[nodo.objeto]
-                    
-                    # Verificar que el atributo existe
-                    clase = self.clases[instancia['__clase__']]
-                    if nodo.atributo not in [a.nombre for a in clase.atributos]:
-                        raise AttributeError(f"Atributo no existe: {nodo.atributo}")
-                    
-                    valor = self.evaluar_expresion(nodo.valor)
-                    self.memoria[nodo.nombre_var] = valor
-                    self.logger.log_execution(
-                        source_code=f"{nodo.nombre_var} := {nodo.valor}",
-                        output=f"{nodo.nombre_var} = {valor}",
-                        command_type="assignment",
-                        metadata={
-                            "variable": nodo.nombre_var,
-                            "value_type": type(valor).__name__
-                        }
-                    )
-                    
-                    if debug:
-                        print(f"[DEBUG] Asignado {nodo.objeto}.{nodo.atributo} = {valor}")
+                    # Evaluar el valor del atributo
+                    valor = self.evaluar_expresion(nodo.valor, debug_mode)
+                    # Verificar que la instancia existe
+                    if nodo.nombre_instancia not in self.memoria:
+                        raise NameError(f"Instancia no definida: '{nodo.nombre_instancia}'")
+                    # Asignar el valor al atributo
+                    self.memoria[nodo.nombre_instancia]['__atributos__'][nodo.nombre_atributo] = valor
+                    if debug_mode:
+                        print(f"[DEBUG] Asignado atributo: {nodo.nombre_instancia}.{nodo.nombre_atributo} = {valor}")
 
                 elif isinstance(nodo, If):
-                    if debug:
-                        print(f"[DEBUG] Evaluando If con condición: {nodo.condicion}")
-                    
-                    # Guardar estado de memoria antes del bloque condicional
-                    memoria_anterior = self.memoria.copy()
-                    try:
-                        # Evaluar condición principal
-                        condicion = self.evaluar_expresion(nodo.condicion, debug)
-                        
-                        if condicion:
-                            if debug:
-                                print("[DEBUG] Ejecutando cuerpo If")
-                            for stmt in nodo.cuerpo:
-                                self.ejecutar([stmt], debug)
-                        else:
-                            # Procesar ELIFs
-                            ejecutado = False
-                            for cond, cuerpo in nodo.elifs:
-                                if self.evaluar_expresion(cond, debug):
-                                    ejecutado = True
-                                    if debug:
-                                        print("[DEBUG] Ejecutando cuerpo Elif")
-                                    for stmt in cuerpo:
-                                        self.ejecutar([stmt], debug)
-                                    break
-                            
-                            # Procesar ELSE si no se ejecutó If ni Elifs
-                            if not ejecutado and nodo.else_cuerpo:
-                                if debug:
-                                    print("[DEBUG] Ejecutando cuerpo Else")
-                                for stmt in nodo.else_cuerpo:
-                                    self.ejecutar([stmt], debug)
-                    except Exception as e:
-                        # Restaurar memoria en caso de error
-                        self.memoria = memoria_anterior
-                        raise
-
-                elif isinstance(nodo, Asignacion):
-                    valor = self.evaluar_expresion(nodo.valor, debug)
-                    self.memoria[nodo.nombre_var] = valor
-                    if debug:
-                        print(f"[DEBUG] Asignado {nodo.nombre_var} = {valor}")
+                    self.evaluar_if(nodo, debug_mode)
 
             except Exception as e:
-                if debug:
-                    print(f"[ERROR] {str(e)}")
-                raise e
+                if debug_mode:
+                    print(f"[ERROR] {type(e).__name__}: {str(e)}")
+                raise
 
-        if debug:
+        if debug_mode:
             print("\n=== Memoria Final ===")
-            for k, v in self.memoria.items():
+            for k, v in sorted(self.memoria.items()):
                 print(f"{k}: {v}")
             print("====================")
     
-
+    def _ejecutar_bloque(self, bloque, tipo="", debug=False):
+        """Método helper para ejecutar bloques de código"""
+        if debug:
+            print(f"Ejecutando {tipo} ({len(bloque)} declaraciones)")
+        
+        for stmt in bloque:
+            self.ejecutar([stmt], debug)
 
     def entrar_ambito(self):
         """Crea un nuevo ámbito heredando las variables del anterior"""
@@ -248,26 +203,21 @@ class Interpreter:
         if isinstance(expr, Booleano):
             return expr.valor
         if isinstance(expr, Variable):
-        # Manejar acceso a atributos (ej: p.nombre)
-            if '.' in expr.nombre:
-                partes = expr.nombre.split('.')
-                if len(partes) != 2:
-                    raise SyntaxError("Sintaxis inválida para acceso a atributo")
-                
-                nombre_instancia, nombre_atributo = partes
-                if nombre_instancia not in self.memoria:
-                    raise NameError(f"Instancia no definida: '{nombre_instancia}'")
-                
-                instancia = self.memoria[nombre_instancia]
-                if not isinstance(instancia, InstanciaClase):
-                    raise TypeError(f"'{nombre_instancia}' no es una instancia de clase")
-                
-                return instancia.atributos.get(nombre_atributo)
-            else:
-                # Variable normal
-                if expr.nombre not in self.memoria:
-                    raise NameError(f"Variable no definida: '{expr.nombre}'")
-                return self.memoria[expr.nombre]
+            nombre_var = expr.nombre
+            if nombre_var not in self.memoria:
+                # Verificar si es un atributo de instancia
+                if '.' in nombre_var:
+                    instancia, atributo = nombre_var.split('.')
+                    if instancia not in self.memoria:
+                        raise NameError(f"Instancia no definida: '{instancia}'")
+                    if not isinstance(self.memoria[instancia], InstanciaClase):
+                        raise TypeError(f"'{instancia}' no es una instancia de clase")
+                    if atributo not in self.memoria[instancia].atributos:
+                        raise AttributeError(f"La instancia '{instancia}' no tiene atributo '{atributo}'")
+                    return self.memoria[instancia].atributos[atributo]
+                else:
+                    raise NameError(f"Variable no definida: '{nombre_var}'")
+            return self.memoria[nombre_var]
         elif isinstance(expr, Cadena):
             return expr.valor
         elif isinstance(expr, OperacionBinaria):
@@ -359,7 +309,7 @@ class Interpreter:
         
         if condicion:
             if debug:
-                print(f"[DEBUG] Ejecutando bloque if con {len(nodo_if.cuerpo)} declaraciones")
+                print(f"[DEBUG] Ejecutando bloque If con {len(nodo_if.cuerpo)} declaraciones")
             # Guardar estado de memoria antes del bloque
             memoria_anterior = self.memoria.copy()
             try:
