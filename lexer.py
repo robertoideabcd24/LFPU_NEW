@@ -66,6 +66,10 @@ class Lexer:
         while self.caracter_actual is not None and (self.caracter_actual.isalnum() or self.caracter_actual == '_'):
             resultado += self.caracter_actual
             self.avanzar()
+        
+        # Verificar si el identificador es demasiado largo (opcional)
+        if len(resultado) > 50:  # Límite arbitrario
+            raise SyntaxError(f"Identificador demasiado largo: '{resultado}'")
 
         # Manejar booleanos primero
         if resultado.lower() == 'true':
